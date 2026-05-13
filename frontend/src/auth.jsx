@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { addNotification } from './db.js'; // Keep only what you need
 
 const API_BASE = 'http://localhost:8000';
 
