@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>College0</title>
+    <style>
+      /* ── CSS Variables - Clean Light Mode (like reference) ── */
+      :root {
+        --bg: #f5f7fa; /* Soft light gray background */
+        --surface: #ffffff; /* White cards */
+        --surface2: #f8f9fa; /* Slightly off-white for hover states */
+        --border: #e5e7eb; /* Light gray borders */
+        --text: #1f2937; /* Dark gray text */
+        --text-light: #6b7280; /* Medium gray for secondary text */
+        --muted: #9ca3af; /* Light gray for muted text */
+        --accent: #3b82f6; /* Blue accent */
+        --accent-hover: #2563eb; /* Darker blue for hover */
+        --accent2: #8b5cf6; /* Purple accent (for variety) */
+        --success: #10b981; /* Green */
+        --warn: #f59e0b; /* Orange */
+        --danger: #ef4444; /* Red */
+        --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.05);
+
+        --font-body:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui,
+          sans-serif;
+        --font-mono: "SF Mono", "JetBrains Mono", monospace;
+        --font-display:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui,
+          sans-serif;
+      }
+
+      /* ── Reset ── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body,
+      #root {
+        height: 100%;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: 14px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Typography ── */
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      /* ── Scrollbar ── */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--bg);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--muted);
+      }
+
+      /* ── Focus ── */
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+
+      /* ── Utility Classes ── */
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
