@@ -15,24 +15,22 @@ export default function InstructorComplaints({ navigate }) {
   const [submitting, setSubmitting] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Fetch data from backend
   const fetchData = async () => {
     if (!currentUser) return;
-
     try {
       setLoading(true);
 
-      // Get instructor's classes and students
       const classesRes = await fetch(`${API_BASE}/api/instructor/${currentUser.id}/classes`);
       const classesData = await classesRes.json();
 
-      // Extract unique students from all classes
+      // Use user_id as the complaint target ID, not the students table PK
       const studentsSet = new Map();
       for (const cls of classesData.classes || []) {
         for (const student of cls.students || []) {
-          if (!studentsSet.has(student.id)) {
-            studentsSet.set(student.id, {
-              id: student.id,
+          const key = student.user_id ?? student.id;
+          if (!studentsSet.has(key)) {
+            studentsSet.set(key, {
+              id: key,           // user_id — what complaints.against_id expects
               name: student.name,
               student_code: student.student_code
             });
@@ -41,11 +39,9 @@ export default function InstructorComplaints({ navigate }) {
       }
       setMyStudents(Array.from(studentsSet.values()));
 
-      // Get instructor's complaints
       const complaintsRes = await fetch(`${API_BASE}/api/complaints/instructor/${String(currentUser.id)}`);
       const complaintsData = await complaintsRes.json();
       setMyComplaints(complaintsData.complaints || []);
-
     } catch (error) {
       console.error('Failed to fetch data:', error);
       setMsg('Failed to load data');
@@ -64,9 +60,7 @@ export default function InstructorComplaints({ navigate }) {
       setMsg('Please select a student and enter a description.');
       return;
     }
-
     setSubmitting(true);
-
     try {
       const response = await fetch(`${API_BASE}/api/complaint/submit`, {
         method: 'POST',
@@ -115,7 +109,8 @@ export default function InstructorComplaints({ navigate }) {
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>File a Complaint</SectionTitle>
         <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '1rem', lineHeight: 1.5 }}>
-          You may file complaints about students in your classes. The registrar must take action: either punish the student or warn you for an unfounded complaint.
+          You may file complaints about students in your classes. The registrar must take action:
+          either punish the student or warn you for an unfounded complaint.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <Select
