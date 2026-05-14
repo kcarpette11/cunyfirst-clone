@@ -12,8 +12,15 @@ export default function InstructorComplaints({ navigate }) {
   const [againstId, setAgainstId] = useState('');
   const [text, setText] = useState('');
   const [msg, setMsg] = useState('');
+  const [msgType, setMsgType] = useState('info');
   const [submitting, setSubmitting] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const showMsg = (text, type = 'info') => {
+    setMsg(text);
+    setMsgType(type);
+    setTimeout(() => setMsg(''), 4000);
+  };
 
   const fetchData = async () => {
     if (!currentUser) return;
@@ -44,8 +51,7 @@ export default function InstructorComplaints({ navigate }) {
       setMyComplaints(complaintsData.complaints || []);
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      setMsg('Failed to load data');
-      setTimeout(() => setMsg(''), 3000);
+      showMsg('Failed to load data', 'danger');
     } finally {
       setLoading(false);
     }
@@ -57,7 +63,7 @@ export default function InstructorComplaints({ navigate }) {
 
   const submit = async () => {
     if (!againstId || !text.trim()) {
-      setMsg('Please select a student and enter a description.');
+      showMsg('Please select a student and enter a description.', 'danger');
       return;
     }
     setSubmitting(true);
@@ -76,18 +82,16 @@ export default function InstructorComplaints({ navigate }) {
       const result = await response.json();
 
       if (result.success) {
-        setMsg('Complaint filed. The registrar will review and take action.');
+        showMsg('Complaint filed. The registrar will review and take action.', 'success');
         setAgainstId('');
         setText('');
         setRefreshTrigger(prev => prev + 1);
       } else {
-        setMsg(result.message || 'Failed to submit complaint');
+        showMsg(result.message || 'Failed to submit complaint', 'danger');
       }
-      setTimeout(() => setMsg(''), 3000);
     } catch (error) {
       console.error('Failed to submit complaint:', error);
-      setMsg('Error submitting complaint');
-      setTimeout(() => setMsg(''), 3000);
+      showMsg('Error submitting complaint', 'danger');
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +108,7 @@ export default function InstructorComplaints({ navigate }) {
   return (
     <div>
       <PageTitle sub="File complaints about students in your classes">Complaints</PageTitle>
-      {msg && <Alert type={msg.startsWith('Please') ? 'danger' : 'success'}>{msg}</Alert>}
+      {msg && <Alert type={msgType}>{msg}</Alert>}
 
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>File a Complaint</SectionTitle>
@@ -134,6 +138,23 @@ export default function InstructorComplaints({ navigate }) {
           </Btn>
         </div>
       </Card>
+
+      <Card>
+        <SectionTitle>My Filed Complaints</SectionTitle>
+        <Table
+          headers={['Against', 'Status', 'Resolution', 'Date']}
+          rows={myComplaints.map(c => [
+            c.against_name || '?',
+            <Tag key="s" color={c.status === 'pending' ? 'var(--warn)' : 'var(--success)'}>{c.status}</Tag>,
+            c.resolution || '—',
+            new Date(c.created_at).toLocaleDateString()
+          ])}
+          emptyMsg="No complaints filed."
+        />
+      </Card>
+    </div>
+  );
+}
 
       <Card>
         <SectionTitle>My Filed Complaints</SectionTitle>
