@@ -78,8 +78,9 @@ async def enroll_student(req: EnrollmentRequest):
 async def drop_enrollment(req: DropEnrollmentRequest):
     """Drop an enrollment"""
     with get_conn() as conn:
+        # FIX: 'code' is on courses (cs), not classes (c) — corrected JOIN order too
         enrollment = conn.execute(
-            "SELECT e.*, c.code FROM enrollments e JOIN classes c ON e.class_id = c.id WHERE e.id = ?",
+            "SELECT e.*, cs.code FROM enrollments e JOIN classes c ON e.class_id = c.id JOIN courses cs ON c.course_id = cs.id WHERE e.id = ?",
             (req.enrollmentId,)
         ).fetchone()
         
@@ -104,8 +105,9 @@ async def get_student_enrollments(user_id: str):
         if not student:
             return {"enrolled": [], "waitlisted": []}
         
+        # FIX: 'code' is on courses (cs), not classes (c)
         enrollments = conn.execute("""
-            SELECT e.*, c.code, cs.title as name, c.class_time, i.name as instructor_name
+            SELECT e.*, cs.code, cs.title as name, c.class_time, i.name as instructor_name
             FROM enrollments e
             JOIN classes c ON e.class_id = c.id
             JOIN courses cs ON c.course_id = cs.id
@@ -132,8 +134,9 @@ async def get_current_enrollments(user_id: str):
         if not student:
             return {"enrollments": []}
         
+        # FIX: 'code' is on courses (cs), not classes (c)
         enrollments = conn.execute("""
-            SELECT e.*, c.code, cs.title as name, c.class_time, i.name as instructor_name
+            SELECT e.*, cs.code, cs.title as name, c.class_time, i.name as instructor_name
             FROM enrollments e
             JOIN classes c ON e.class_id = c.id
             JOIN courses cs ON c.course_id = cs.id
