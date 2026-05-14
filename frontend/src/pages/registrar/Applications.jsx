@@ -18,9 +18,10 @@ export default function Applications({ navigate }) {
 
       const response = await fetch(`${API_BASE}/api/applications`);
       const data = await response.json();
+      const all = data.applications || [];
 
-      setPendingApps(data.pending || []);
-      setProcessedApps(data.processed || []);
+      setPendingApps(all.filter(a => a.status === 'pending'));
+      setProcessedApps(all.filter(a => a.status !== 'pending'));
     } catch (error) {
       console.error('Failed to fetch applications:', error);
       setMsg('Failed to load applications');
