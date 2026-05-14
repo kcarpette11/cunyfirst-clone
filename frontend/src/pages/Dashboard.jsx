@@ -96,7 +96,7 @@ export default function Dashboard({ navigate }) {
         <div style={{ position: 'absolute', bottom: 0, left: '40%', width: '200px', height: '200px', background: 'var(--accent2)', opacity: 0.05, borderRadius: '50%', transform: 'translateY(50%)' }} />
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>WELCOME TO</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '3.5rem', fontWeight: 900, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
-          College<span style={{ color: 'var(--accent)' }}>0</span>
+          Cuny<span style={{ color: 'var(--accent)' }}>Zero</span>
         </h1>
         <p style={{ color: 'var(--muted)', marginTop: '1rem', maxWidth: '500px', lineHeight: 1.6, fontSize: '14px' }}>
           An AI-enabled graduate college management system. Manage courses, track academic progress, and connect with an intelligent assistant — all in one place.
