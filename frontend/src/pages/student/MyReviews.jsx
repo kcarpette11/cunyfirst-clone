@@ -1,222 +1,323 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../auth.jsx';
-import { PageTitle, Card, Btn, Tag, Alert, SectionTitle, Stars, Textarea } from '../../components/UI.jsx';
+import { PageTitle, Card, Btn, Alert, SectionTitle, Stars } from '../../components/UI.jsx';
 
 const API_BASE = 'http://localhost:8000';
 
 export default function MyReviews({ navigate }) {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [myEnrollments, setMyEnrollments] = useState([]);
-  const [classData, setClassData] = useState({});
-  const [reviews, setReviews] = useState({});
-  const [reviewForms, setReviewForms] = useState({});
-  const [currentPeriod, setCurrentPeriod] = useState('');
+  const [enrolledClasses, setEnrolledClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [existingReview, setExistingReview] = useState(null);
+  const [rating, setRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
   const [msg, setMsg] = useState({ text: '', type: 'info' });
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch all data from backend
-  const fetchData = async () => {
-    if (!currentUser) return;
-
+  // Fetch enrolled classes for the student
+  const fetchEnrolledClasses = async () => {
     try {
-      setLoading(true);
-
-      // Get current period
-      const periodRes = await fetch(`${API_BASE}/api/semester/period`);
-      const periodData = await periodRes.json();
-      setCurrentPeriod(periodData.period);
-
-      // Get student's enrollments
-      const enrollRes = await fetch(`${API_BASE}/api/student/${currentUser.id}/enrollments`);
-      const enrollData = await enrollRes.json();
-
-      const enrolled = enrollData.enrolled || [];
-      setMyEnrollments(enrolled);
-
-      // Fetch data for each enrolled class
-      const classInfo = {};
-      const reviewsInfo = {};
-
-      for (const enrollment of enrolled) {
-        // Get class details
-        const classRes = await fetch(`${API_BASE}/api/class/${enrollment.classId}`);
-        const classData = await classRes.json();
-        classInfo[enrollment.classId] = classData;
-
-        // Get reviews for this class
-        const reviewsRes = await fetch(`${API_BASE}/api/class/${enrollment.classId}/reviews`);
-        const reviewsData = await reviewsRes.json();
-        reviewsInfo[enrollment.classId] = reviewsData.reviews || [];
-
-        // Get student's own review
-        const myReviewRes = await fetch(`${API_BASE}/api/student/${currentUser.id}/review/${enrollment.classId}`);
-        const myReviewData = await myReviewRes.json();
-        if (myReviewData.review) {
-          reviewsInfo[enrollment.classId].myReview = myReviewData.review;
-        }
+      const studentId = currentUser?.user_id || currentUser?.id;
+      if (!studentId) {
+        console.log('No student ID available');
+        setLoading(false);
+        return;
       }
 
-      setClassData(classInfo);
-      setReviews(reviewsInfo);
+      console.log('Fetching enrollments for student:', studentId);
+      const response = await fetch(`${API_BASE}/api/student/${studentId}/enrollments`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Enrolled classes data:', data);
+
+      // Map the data to ensure we have the right fields
+      const classes = (data.enrolled || []).map(cls => ({
+        id: cls.class_id,
+        class_id: cls.class_id,
+        code: cls.code,
+        name: cls.name,
+        class_time: cls.class_time,
+        instructor_name: cls.instructor_name,
+        enrollment_id: cls.enrollment_id
+      }));
+
+      console.log('Processed enrolled classes:', classes);
+      setEnrolledClasses(classes);
     } catch (error) {
-      console.error('Failed to fetch data:', error);
-      setMsg({ text: 'Failed to load review data', type: 'danger' });
+      console.error('Error fetching enrolled classes:', error);
+      setMsg({ text: 'Failed to load your enrolled classes', type: 'danger' });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [currentUser, refreshTrigger]);
-
-  const setForm = (classId, key, value) => {
-    setReviewForms(f => ({ ...f, [classId]: { ...f[classId], [key]: value } }));
-  };
-
-  const submit = async (classId) => {
-    const form = reviewForms[classId] || {};
-    if (!form.stars) {
-      setMsg({ text: 'Please select a star rating.', type: 'danger' });
-      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
-      return;
-    }
-    if (!form.text?.trim()) {
-      setMsg({ text: 'Please write a review.', type: 'danger' });
-      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+  // Fetch existing review for selected class
+  const fetchExistingReview = async (classId) => {
+    if (!classId) {
+      console.log('No class ID provided to fetchExistingReview');
       return;
     }
 
     try {
+      const studentId = currentUser?.user_id || currentUser?.id;
+      if (!studentId) {
+        console.log('No student ID available');
+        return;
+      }
+
+      console.log(`Fetching review for student ${studentId}, class ${classId}`);
+      const response = await fetch(`${API_BASE}/api/student/${studentId}/review/${classId}`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('No existing review found');
+          setExistingReview(null);
+          setRating(0);
+          setReviewText('');
+          return;
+        }
+        throw new Error(`Failed to fetch review: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Review data received:', data);
+
+      if (data.review) {
+        setExistingReview(data.review);
+        setRating(data.review.stars || 0);
+        setReviewText(data.review.text || '');
+      } else {
+        setExistingReview(null);
+        setRating(0);
+        setReviewText('');
+      }
+    } catch (error) {
+      console.error('Error fetching review:', error);
+      setExistingReview(null);
+      setRating(0);
+      setReviewText('');
+    }
+  };
+
+  // Handle class selection
+  const handleClassSelect = (classObj) => {
+    console.log('Selected class:', classObj);
+    setSelectedClass(classObj);
+    const classId = classObj.class_id || classObj.id;
+    if (classId) {
+      fetchExistingReview(classId);
+    }
+  };
+
+  // Submit review
+  const submitReview = async () => {
+    if (!selectedClass) {
+      setMsg({ text: 'Please select a class first', type: 'danger' });
+      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+      return;
+    }
+
+    if (rating === 0) {
+      setMsg({ text: 'Please select a star rating', type: 'danger' });
+      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+      return;
+    }
+
+    if (!reviewText.trim()) {
+      setMsg({ text: 'Please write a review', type: 'danger' });
+      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const studentId = currentUser?.user_id || currentUser?.id;
+      const classId = selectedClass.class_id || selectedClass.id;
+
+      console.log('Submitting review:', {
+        studentId: String(studentId),
+        classId: parseInt(classId),
+        stars: rating,
+        text: reviewText
+      });
+
       const response = await fetch(`${API_BASE}/api/review/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: currentUser.id,
-          classId: classId,
-          stars: form.stars,
-          text: form.text
+          studentId: String(studentId),
+          classId: parseInt(classId),
+          stars: rating,
+          text: reviewText
         })
       });
 
       const result = await response.json();
-
-      setMsg({ text: result.message, type: result.success ? 'success' : 'danger' });
+      console.log('Submit review result:', result);
 
       if (result.success) {
-        setReviewForms(f => ({ ...f, [classId]: {} }));
-        setRefreshTrigger(prev => prev + 1);
+        setMsg({ text: result.message || 'Review submitted successfully!', type: 'success' });
+
+        // Refresh the existing review
+        await fetchExistingReview(classId);
+
+        // Clear form if it was a new review (not an update)
+        if (!existingReview) {
+          setRating(0);
+          setReviewText('');
+        }
+      } else {
+        setMsg({ text: result.message || 'Failed to submit review', type: 'danger' });
       }
 
       setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
     } catch (error) {
-      setMsg({ text: 'Failed to submit review', type: 'danger' });
+      console.error('Error submitting review:', error);
+      setMsg({ text: 'Failed to submit review. Please try again.', type: 'danger' });
       setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const canReview = currentPeriod === 'running' || currentPeriod === 'grading';
+  useEffect(() => {
+    if (currentUser) {
+      fetchEnrolledClasses();
+    } else {
+      setLoading(false);
+    }
+  }, [currentUser]);
 
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '3rem' }}>
-        <div>Loading your reviews...</div>
+        <div>Loading...</div>
       </div>
     );
   }
 
   return (
     <div>
-      <PageTitle sub="Rate and review your enrolled courses">Course Reviews</PageTitle>
+      <PageTitle sub="Share your feedback about the courses you've taken">
+        My Reviews
+      </PageTitle>
 
-      {!canReview && <Alert type="warn">Reviews can only be submitted during the running or grading period.</Alert>}
       {msg.text && <Alert type={msg.type}>{msg.text}</Alert>}
 
-      <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.75rem 1rem', marginBottom: '1.5rem', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>
-        ℹ Reviews are anonymous — only the registrar can see who wrote which review. Avoid taboo words: 1–2 occurrences = censored + warning; 3+ = review hidden + 2 warnings.
-      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+        {/* Left column - Class selection */}
+        <Card>
+          <SectionTitle>Select a Class</SectionTitle>
+          {enrolledClasses.length === 0 && (
+            <p style={{ color: 'var(--muted)', fontSize: '13px' }}>
+              You haven't completed any classes yet. Once you complete a class, you'll be able to review it here.
+            </p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {enrolledClasses.map(cls => {
+              const classId = cls.class_id || cls.id;
+              const isSelected = selectedClass && (selectedClass.class_id === classId || selectedClass.id === classId);
 
-      {myEnrollments.length === 0 && (
-        <Card><p style={{ color: 'var(--muted)' }}>You are not enrolled in any courses this semester.</p></Card>
-      )}
+              return (
+                <div
+                  key={classId}
+                  onClick={() => handleClassSelect(cls)}
+                  style={{
+                    padding: '1rem',
+                    border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{cls.code}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--muted)' }}>{cls.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{cls.instructor_name || 'TBA'}</div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
 
-      {myEnrollments.map(enrollment => {
-        const cls = classData[enrollment.classId];
-        if (!cls) return null;
+        {/* Right column - Review form */}
+        <Card>
+          <SectionTitle>
+            {existingReview ? 'Edit Your Review' : 'Write a Review'}
+          </SectionTitle>
 
-        const allReviews = reviews[enrollment.classId] || [];
-        const myReview = allReviews.find(r => r.isMine) || reviews[enrollment.classId]?.myReview;
-        const avgRating = allReviews.length ? allReviews.reduce((s, r) => s + r.stars, 0) / allReviews.length : null;
-        const form = reviewForms[enrollment.classId] || {};
-        const gradePosted = enrollment.grade && enrollment.grade !== 'IP';
-
-        return (
-          <Card key={enrollment.id} style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>{cls.code}</div>
-                <div style={{ fontWeight: 600, fontSize: '1rem' }}>{cls.name}</div>
-                <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{cls.instructorName} · {cls.class_time}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                {avgRating !== null && (
-                  <>
-                    <Stars value={Math.round(avgRating)} />
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>{avgRating.toFixed(1)} avg ({allReviews.length} reviews)</div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Existing reviews (anonymous) */}
-            {allReviews.length > 0 && (
+          {!selectedClass ? (
+            <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '2rem' }}>
+              Select a class from the left to write a review
+            </p>
+          ) : (
+            <>
               <div style={{ marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-                  Class Reviews ({allReviews.length})
+                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                  {selectedClass.code} - {selectedClass.name}
                 </div>
-                {allReviews.filter(r => !r.isMine).map(r => (
-                  <div key={r.id} style={{ borderLeft: '2px solid var(--border)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
-                    <Stars value={r.stars} />
-                    <div style={{ fontSize: '13px', color: 'var(--muted)', fontStyle: 'italic' }}>{r.text}</div>
-                  </div>
-                ))}
+                <div style={{ fontSize: '13px', color: 'var(--muted)' }}>
+                  Instructor: {selectedClass.instructor_name || 'TBA'}
+                </div>
               </div>
-            )}
 
-            {/* Write review */}
-            {myReview ? (
-              <div style={{ background: 'var(--surface2)', borderRadius: '4px', padding: '0.75rem' }}>
-                <Tag color="var(--success)">✓ You reviewed this course</Tag>
-                <div style={{ marginTop: '0.5rem' }}>
-                  <Stars value={myReview.stars} />
-                  <div style={{ fontSize: '13px', color: 'var(--muted)', fontStyle: 'italic', marginTop: '0.25rem' }}>{myReview.text}</div>
-                  {!myReview.visible && <Tag color="var(--danger)" style={{ marginTop: '0.25rem' }}>Hidden (taboo content)</Tag>}
-                </div>
-              </div>
-            ) : gradePosted ? (
-              <Alert type="warn">Your grade has been posted — you can no longer submit a review.</Alert>
-            ) : canReview ? (
-              <div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Write a Review</div>
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '0.25rem' }}>RATING</div>
-                  <Stars value={form.stars || 0} onChange={v => setForm(enrollment.classId, 'stars', v)} />
-                </div>
-                <Textarea
-                  value={form.text || ''}
-                  onChange={v => setForm(enrollment.classId, 'text', v)}
-                  rows={3}
-                  placeholder="Share your experience with this course..."
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                  Rating
+                </label>
+                <Stars
+                  value={rating}
+                  editable={true}
+                  onChange={(newRating) => setRating(newRating)}
                 />
-                <Btn variant="primary" onClick={() => submit(enrollment.classId)} style={{ marginTop: '0.5rem' }}>Submit Review</Btn>
               </div>
-            ) : (
-              <p style={{ color: 'var(--muted)', fontSize: '13px' }}>Reviews not currently open.</p>
-            )}
-          </Card>
-        );
-      })}
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+                  Your Review
+                </label>
+                <textarea
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  placeholder="Share your experience with this course..."
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--surface)',
+                    color: 'var(--foreground)',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    minHeight: '120px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <Btn
+                onClick={submitReview}
+                disabled={submitting || rating === 0 || !reviewText.trim()}
+                style={{ width: '100%' }}
+              >
+                {submitting ? 'Submitting...' : (existingReview ? 'Update Review' : 'Submit Review')}
+              </Btn>
+
+              {existingReview && (
+                <p style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '1rem', textAlign: 'center' }}>
+                  You've already reviewed this class. Submitting will update your existing review.
+                </p>
+              )}
+            </>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

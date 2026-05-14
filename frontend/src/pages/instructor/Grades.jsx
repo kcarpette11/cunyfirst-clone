@@ -26,12 +26,16 @@ export default function Grades({ navigate }) {
       const periodData = await periodRes.json();
       setCurrentPeriod(periodData.period);
 
-      // Get instructor's classes
-      const classesRes = await fetch(`${API_BASE}/api/instructor/${currentUser.id}/classes`);
+      // Get instructor's classes - use user_id instead of id
+      const instructorId = currentUser.user_id || currentUser.id;
+      console.log('Fetching classes for instructor:', instructorId);
+
+      const classesRes = await fetch(`${API_BASE}/api/instructor/${instructorId}/classes`);
       const classesData = await classesRes.json();
 
       // Filter to only active (not cancelled) classes
       const activeClasses = (classesData.classes || []).filter(c => !c.cancelled);
+      console.log('Classes loaded:', activeClasses);
       setMyClasses(activeClasses);
 
     } catch (error) {
@@ -86,12 +90,14 @@ export default function Grades({ navigate }) {
     }
 
     try {
+      const instructorId = currentUser.user_id || currentUser.id;
+
       const response = await fetch(`${API_BASE}/api/grade-justification/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instructorId: currentUser.id,
-          classId: classId,
+          instructorId: parseInt(instructorId),
+          classId: parseInt(classId),
           justification: j
         })
       });
@@ -111,6 +117,14 @@ export default function Grades({ navigate }) {
       setMsg('Error submitting justification');
       setTimeout(() => setMsg(''), 2000);
     }
+  };
+
+  // Helper function to safely format GPA
+  const formatGPA = (gpa) => {
+    if (gpa === null || gpa === undefined || isNaN(gpa)) {
+      return null;
+    }
+    return parseFloat(gpa).toFixed(2);
   };
 
   if (loading) {
@@ -138,7 +152,8 @@ export default function Grades({ navigate }) {
       {myClasses.map(cls => {
         const students = cls.students || [];
         const classGpa = cls.class_gpa;
-        const flagged = classGpa !== null && (classGpa > 3.5 || classGpa < 2.5);
+        const formattedGpa = formatGPA(classGpa);
+        const flagged = formattedGpa !== null && (parseFloat(formattedGpa) > 3.5 || parseFloat(formattedGpa) < 2.5);
         const hasJustification = cls.has_justification || false;
 
         return (
@@ -149,9 +164,9 @@ export default function Grades({ navigate }) {
                 <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600 }}>{cls.name}</h3>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                {classGpa !== null && (
-                  <Tag color={flagged ? (classGpa > 3.5 ? 'var(--accent)' : 'var(--danger)') : 'var(--success)'}>
-                    Class GPA: {classGpa.toFixed(2)}
+                {formattedGpa !== null && (
+                  <Tag color={flagged ? (parseFloat(formattedGpa) > 3.5 ? 'var(--accent)' : 'var(--danger)') : 'var(--success)'}>
+                    Class GPA: {formattedGpa}
                   </Tag>
                 )}
                 {flagged && <Tag color="var(--warn)">⚠ Flagged</Tag>}
@@ -161,7 +176,7 @@ export default function Grades({ navigate }) {
             {flagged && (
               <div style={{ background: 'var(--warn)18', border: '1px solid var(--warn)', borderRadius: '4px', padding: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--warn)', marginBottom: '0.5rem' }}>
-                  Class GPA is {classGpa > 3.5 ? 'above 3.5 (possible grade inflation)' : 'below 2.5 (possible excessive failing)'}. Submit a justification to the registrar.
+                  Class GPA is {parseFloat(formattedGpa) > 3.5 ? 'above 3.5 (possible grade inflation)' : 'below 2.5 (possible excessive failing)'}. Submit a justification to the registrar.
                 </div>
                 {hasJustification ? (
                   <Tag color="var(--success)">Justification submitted ✓</Tag>

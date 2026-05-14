@@ -11,7 +11,10 @@
 # Environment files
 .env
 .env.local
-.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
 
 # Node / frontend
 node_modules/

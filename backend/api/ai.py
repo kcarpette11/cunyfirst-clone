@@ -220,37 +220,3 @@ async def ask(req: AskRequest):
         traceback.print_exc()
         print("!"*60 + "\n")
         raise HTTPException(status_code=500, detail=f"AI server error: {str(e)}")
-
-@router.get("/ai/context/{user_id}")
-async def get_ai_context(user_id: int):
-    """Get context data for AI assistant"""
-    from database import get_conn, get_setting
-    
-    with get_conn() as conn:
-        context = {
-            "currentPeriod": get_setting("period") or "registration",
-            "programQuota": 100,
-            "tabooWords": [w["word"] for w in conn.execute("SELECT word FROM taboo_words").fetchall()],
-            "classes": [],
-            "student": None,
-            "instructor": None
-        }
-        
-        # Get user info
-        user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        
-        if user and user['role'] == 'student':
-            student = conn.execute(
-                "SELECT * FROM students WHERE user_id = ?", (user_id,)
-            ).fetchone()
-            if student:
-                context["student"] = dict(student)
-        
-        if user and user['role'] == 'instructor':
-            instructor = conn.execute(
-                "SELECT * FROM instructors WHERE user_id = ?", (user_id,)
-            ).fetchone()
-            if instructor:
-                context["instructor"] = dict(instructor)
-        
-        return context

@@ -3,6 +3,7 @@ import { useAuth } from '../../auth.jsx';
 import { PageTitle, Card, Btn, Tag, Alert, SectionTitle, Stars, Table } from '../../components/UI.jsx';
 
 const API_BASE = 'http://localhost:8000';
+const MAX_COURSES = 6;
 
 export default function CourseRegistration({ navigate }) {
   const { currentUser } = useAuth();
@@ -14,27 +15,42 @@ export default function CourseRegistration({ navigate }) {
   const [semesterNumber, setSemesterNumber] = useState(1);
   const [msg, setMsg] = useState({ text: '', type: 'info' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Fetch all data from backend
   const fetchData = async () => {
     try {
       setLoading(true);
+      console.log('Fetching data...');
 
-      // Fetch current period and semester
       const periodRes = await fetch(`${API_BASE}/api/semester/period`);
       const periodData = await periodRes.json();
       setCurrentPeriod(periodData.period);
       setSemesterNumber(periodData.semester || 1);
 
-      // Fetch available classes
       const classesRes = await fetch(`${API_BASE}/api/classes?semester=${periodData.semester || 1}`);
       const classesData = await classesRes.json();
       setAvailableClasses(classesData.classes || []);
 
-      // Fetch student's enrollments
       if (currentUser) {
-        const enrollRes = await fetch(`${API_BASE}/api/student/${currentUser.id}/enrollments`);
+        const studentId = currentUser.user_id || currentUser.id;
+        console.log('Fetching enrollments for student:', studentId);
+
+        const enrollRes = await fetch(`${API_BASE}/api/student/${studentId}/enrollments`);
+
+        if (!enrollRes.ok) {
+          console.error('Failed to fetch enrollments:', enrollRes.status);
+          setEnrolled([]);
+          setWaitlisted([]);
+          return;
+        }
+
         const enrollData = await enrollRes.json();
+        console.log('Enrollment data received:', enrollData);
+        console.log('Enrolled courses:', enrollData.enrolled);
+        console.log('Waitlisted courses:', enrollData.waitlisted);
+        console.log('RAW enrollment data:', JSON.stringify(enrollData, null, 2));
+        console.log('Enrolled array:', enrollData.enrolled);
+        console.log('First enrolled item structure:', enrollData.enrolled[0]);
 
         setEnrolled(enrollData.enrolled || []);
         setWaitlisted(enrollData.waitlisted || []);
@@ -54,59 +70,162 @@ export default function CourseRegistration({ navigate }) {
   const canRegister = currentPeriod === 'registration' ||
     (currentPeriod === 'running' && currentUser && !currentUser.suspended);
 
-  const enroll = async (classId) => {
-    try {
-      const response = await fetch(`${API_BASE}/api/enroll`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: currentUser.id,
-          classId: classId,
-          semester: semesterNumber
-        })
-      });
+  const drop = async (enrollment_id, code) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
 
-      const result = await response.json();
-
-      setMsg({
-        text: result.message,
-        type: result.success ? (result.waitlist ? 'warn' : 'success') : 'danger'
-      });
-
-      if (result.success) {
-        // Refresh data
-        setRefreshTrigger(prev => prev + 1);
-      }
-
-      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
-    } catch (error) {
-      setMsg({ text: 'Failed to enroll. Please try again.', type: 'danger' });
-      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
-    }
-  };
-
-  const drop = async (enrollmentId, code) => {
+    console.log('Dropping enrollment:', enrollment_id);
     try {
       const response = await fetch(`${API_BASE}/api/enrollment/drop`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enrollmentId })
+        body: JSON.stringify({ enrollment_id })
       });
 
-      const result = await response.json();
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Drop error response:', errorText);
+        setMsg({
+          text: `Failed to drop: ${response.status}`,
+          type: 'danger'
+        });
+        setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+        return;
+      }
 
-      if (result.success) {
+      const result = await response.json();
+      console.log('Drop result:', result);
+
+      if (result && result.success) {
         setMsg({ text: `Dropped ${code}.`, type: 'info' });
+        // Force a complete refresh by incrementing refreshTrigger
         setRefreshTrigger(prev => prev + 1);
       } else {
-        setMsg({ text: result.message || 'Failed to drop course', type: 'danger' });
+        setMsg({ text: result?.message || 'Failed to drop course', type: 'danger' });
       }
 
       setTimeout(() => setMsg({ text: '', type: 'info' }), 2000);
     } catch (error) {
+      console.error('Drop error:', error);
       setMsg({ text: 'Failed to drop course', type: 'danger' });
       setTimeout(() => setMsg({ text: '', type: 'info' }), 2000);
+    } finally {
+      setIsProcessing(false);
     }
+  };
+
+  const enroll = async (classId) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    try {
+      const studentId = currentUser.user_id || currentUser.id;
+
+      const payload = {
+        studentId: String(studentId),
+        classId: String(classId),
+        semester: semesterNumber
+      };
+
+      console.log('Enroll payload:', payload);
+
+      const response = await fetch(`${API_BASE}/api/enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+
+        let errorMessage = `Error ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+
+        setMsg({
+          text: errorMessage,
+          type: 'danger'
+        });
+        setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+        return;
+      }
+
+      const result = await response.json();
+      console.log('Enroll result:', result);
+
+      if (result && result.success) {
+        setMsg({
+          text: result.message,
+          type: result.waitlist ? 'warn' : 'success'
+        });
+        // Force a complete refresh by incrementing refreshTrigger
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        setMsg({
+          text: result?.message || 'Enrollment failed',
+          type: 'danger'
+        });
+      }
+
+      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+    } catch (error) {
+      console.error('Enrollment error:', error);
+      setMsg({ text: 'Network error. Please check if server is running.', type: 'danger' });
+      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const fixStuckEnrollment = async (classId, className) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    try {
+      const studentId = currentUser.user_id || currentUser.id;
+      console.log(`Fixing enrollment for ${className}...`);
+
+      // Get current enrollments
+      const enrollRes = await fetch(`${API_BASE}/api/student/${studentId}/enrollments`);
+      if (!enrollRes.ok) {
+        console.error('Failed to fetch enrollments');
+        await enroll(classId);
+        return;
+      }
+
+      const data = await enrollRes.json();
+      const allEnrollments = [...(data.enrolled || []), ...(data.waitlisted || [])];
+      const existingEnrollment = allEnrollments.find(e => e.class_id === classId);
+
+      if (existingEnrollment && existingEnrollment.status !== 'registered') {
+        console.log(`Found ${existingEnrollment.status} enrollment, dropping it first...`);
+        await drop(existingEnrollment.enrollment_id, className);
+        // Wait a bit then enroll
+        setTimeout(async () => {
+          await enroll(classId);
+        }, 1000);
+      } else {
+        await enroll(classId);
+      }
+    } catch (error) {
+      console.error('Fix enrollment error:', error);
+      setMsg({ text: 'Failed to fix enrollment', type: 'danger' });
+      setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const manualRefresh = () => {
+    console.log('Manual refresh triggered');
+    setRefreshTrigger(prev => prev + 1);
   };
 
   if (loading) {
@@ -119,9 +238,15 @@ export default function CourseRegistration({ navigate }) {
 
   return (
     <div>
-      <PageTitle sub={`Period: ${currentPeriod} · Enrolled: ${enrolled.length}/4`}>
+      <PageTitle sub={`Period: ${currentPeriod} · Enrolled: ${enrolled.length}/${MAX_COURSES}`}>
         Course Registration
       </PageTitle>
+
+      <div style={{ marginBottom: '1rem', textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+        <Btn variant="default" onClick={manualRefresh} disabled={isProcessing} style={{ fontSize: '12px' }}>
+          🔄 Refresh
+        </Btn>
+      </div>
 
       {!canRegister && (
         <Alert type="warn">
@@ -133,9 +258,8 @@ export default function CourseRegistration({ navigate }) {
       )}
       {msg.text && <Alert type={msg.type}>{msg.text}</Alert>}
 
-      {/* My Enrollments */}
       <Card style={{ marginBottom: '1.5rem' }}>
-        <SectionTitle>My Enrollments ({enrolled.length}/4)</SectionTitle>
+        <SectionTitle>My Enrollments ({enrolled.length}/{MAX_COURSES})</SectionTitle>
         {enrolled.length === 0 && (
           <p style={{ color: 'var(--muted)', fontSize: '13px' }}>
             Not enrolled in any courses.
@@ -147,10 +271,10 @@ export default function CourseRegistration({ navigate }) {
             rows={enrolled.map(e => [
               e.code,
               e.name,
-              e.time,
-              e.instructorName || '?',
+              e.class_time,
+              e.instructor_name || 'TBA',
               canRegister ? (
-                <Btn key="d" variant="danger" onClick={() => drop(e.enrollmentId, e.code)}>
+                <Btn key="d" variant="danger" onClick={() => drop(e.enrollment_id, e.code)} disabled={isProcessing}>
                   Drop
                 </Btn>
               ) : '—'
@@ -167,10 +291,10 @@ export default function CourseRegistration({ navigate }) {
               marginBottom: '0.5rem',
               textTransform: 'uppercase'
             }}>
-              Waitlisted
+              Waitlisted ({waitlisted.length})
             </div>
             {waitlisted.map(e => (
-              <div key={e.enrollmentId} style={{
+              <div key={e.enrollment_id} style={{
                 display: 'flex',
                 gap: '0.5rem',
                 alignItems: 'center',
@@ -181,7 +305,8 @@ export default function CourseRegistration({ navigate }) {
                   {e.code} — {e.name}
                 </span>
                 <Btn
-                  onClick={() => drop(e.enrollmentId, e.code)}
+                  onClick={() => drop(e.enrollment_id, e.code)}
+                  disabled={isProcessing}
                   style={{ fontSize: '11px', padding: '0.2rem 0.5rem' }}
                 >
                   Remove
@@ -192,7 +317,6 @@ export default function CourseRegistration({ navigate }) {
         )}
       </Card>
 
-      {/* Available Classes */}
       <SectionTitle>Available Classes</SectionTitle>
       <div style={{
         display: 'grid',
@@ -200,10 +324,11 @@ export default function CourseRegistration({ navigate }) {
         gap: '1rem'
       }}>
         {availableClasses.map(cls => {
-          const alreadyEnrolled = enrolled.some(e => e.classId === cls.id);
-          const onWaitlist = waitlisted.some(e => e.classId === cls.id);
-          const isFull = cls.enrolledCount >= cls.capacity;
-          const avgRating = cls.avgRating;
+          const alreadyEnrolled = enrolled.some(e => e.class_id === cls.id);
+          const onWaitlist = waitlisted.some(e => e.class_id === cls.id);
+          const isFull = (cls.enrolled_count || 0) >= cls.capacity;
+          const avgRating = cls.avg_rating;
+          const isAtMaxCourses = enrolled.length >= MAX_COURSES;
 
           return (
             <div key={cls.id} style={{
@@ -224,7 +349,7 @@ export default function CourseRegistration({ navigate }) {
               <div style={{ fontWeight: 600 }}>{cls.name}</div>
               <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{cls.class_time}</div>
               <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                Instructor: {cls.instructorName}
+                Instructor: {cls.instructor_name || 'TBA'}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{
@@ -232,7 +357,7 @@ export default function CourseRegistration({ navigate }) {
                   fontSize: '11px',
                   color: isFull ? 'var(--danger)' : 'var(--success)'
                 }}>
-                  {cls.enrolledCount || 0}/{cls.capacity} {isFull ? '(Full)' : 'spots'}
+                  {cls.enrolled_count || 0}/{cls.capacity} {isFull ? '(Full)' : 'spots'}
                 </span>
                 {avgRating !== null && avgRating > 0 && (
                   <Stars value={Math.round(avgRating)} />
@@ -246,11 +371,11 @@ export default function CourseRegistration({ navigate }) {
                 ) : (
                   <Btn
                     variant={isFull ? 'default' : 'primary'}
-                    onClick={() => enroll(cls.id)}
-                    disabled={!canRegister || currentUser?.suspended || enrolled.length >= 4}
+                    onClick={() => fixStuckEnrollment(cls.id, cls.name)}
+                    disabled={!canRegister || currentUser?.suspended || isAtMaxCourses || isProcessing}
                     style={{ width: '100%' }}
                   >
-                    {isFull ? 'Join Waitlist' : 'Enroll'}
+                    {isProcessing ? 'Processing...' : (isFull ? 'Join Waitlist' : 'Enroll')}
                   </Btn>
                 )}
               </div>

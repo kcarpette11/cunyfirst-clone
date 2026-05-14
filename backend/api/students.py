@@ -55,38 +55,49 @@ async def get_student(user_id: int):
 async def get_student_dashboard(user_id: int):
     """Get dashboard data for a student"""
     with get_conn() as conn:
+        # Get student info
         student = conn.execute("""
-            SELECT s.*, u.username
-            FROM students s
-            JOIN users u ON s.user_id = u.id
-            WHERE u.id = ?
+            SELECT s.* 
+            FROM students s 
+            WHERE s.user_id = ?
         """, (user_id,)).fetchone()
         
         if not student:
             return {"error": "Student not found"}
         
         # Get current semester
-        semester = conn.execute("SELECT value FROM settings WHERE key = 'semester'").fetchone()
-        current_semester = int(semester['value']) if semester else 1
+        semester_result = conn.execute("SELECT value FROM settings WHERE key = 'semester'").fetchone()
+        current_semester = int(semester_result['value']) if semester_result else 1
         
-        # Calculate overall GPA
-        grades = conn.execute("""
+        # Get all grades for GPA calculation
+        all_grades = conn.execute("""
             SELECT grade FROM enrollments 
             WHERE student_id = ? AND grade IS NOT NULL AND grade != 'IP'
         """, (student['id'],)).fetchall()
         
-        overall_gpa = calculate_gpa([g['grade'] for g in grades]) if grades else None
+        grade_points = {'A': 4.0, 'B': 3.0, 'C': 2.0, 'D': 1.0, 'F': 0.0}
+        overall_gpa = None
+        if all_grades:
+            total = 0
+            for g in all_grades:
+                total += grade_points.get(g['grade'], 0)
+            overall_gpa = total / len(all_grades)
         
-        # Calculate semester GPA
+        # Get current semester grades
         sem_grades = conn.execute("""
             SELECT grade FROM enrollments 
             WHERE student_id = ? AND semester = ? AND grade IS NOT NULL AND grade != 'IP'
         """, (student['id'], current_semester)).fetchall()
         
-        semester_gpa = calculate_gpa([g['grade'] for g in sem_grades]) if sem_grades else None
+        semester_gpa = None
+        if sem_grades:
+            total = 0
+            for g in sem_grades:
+                total += grade_points.get(g['grade'], 0)
+            semester_gpa = total / len(sem_grades)
         
         # Count completed courses
-        completed = conn.execute("""
+        completed_result = conn.execute("""
             SELECT COUNT(*) as count FROM enrollments 
             WHERE student_id = ? AND grade IS NOT NULL AND grade != 'F' AND grade != 'IP'
         """, (student['id'],)).fetchone()
@@ -94,17 +105,17 @@ async def get_student_dashboard(user_id: int):
         return {
             "overallGPA": overall_gpa,
             "semesterGPA": semester_gpa,
-            "completedCourses": completed['count'] if completed else 0,
+            "completedCourses": completed_result['count'] if completed_result else 0,
             "warnings": student['warnings'] or 0,
             "honorCount": student['honor_count'] or 0,
             "onHonorRoll": student['honor_roll'] or False,
             "isTerminated": student['terminated'] or False,
-            "isGraduated": student.get('graduated', False),
-            "isSuspended": student.get('suspended', False),
-            "pendingInterview": student.get('pending_interview', False),
-            "isNew": student.get('is_new', False)
+            "isGraduated": student['graduated'] if 'graduated' in student.keys() else False,
+            "isSuspended": student['suspended'] if 'suspended' in student.keys() else False,
+            "pendingInterview": student['pending_interview'] if 'pending_interview' in student.keys() else False,
+            "isNew": False
         }
-
+        
 @router.get("/api/student/{user_id}/academic-history")
 async def get_academic_history(user_id: int):
     """Get academic history for a student"""
