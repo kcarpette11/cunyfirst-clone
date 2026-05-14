@@ -12,7 +12,7 @@ async def apply_for_graduation(req: GraduationApplyRequest):
     with get_conn() as conn:
         # Get student
         student = conn.execute(
-            "SELECT s.*, u.name FROM students s JOIN users u ON s.user_id = u.id WHERE s.user_id = ?",
+            "SELECT s.* FROM students s WHERE s.user_id = ?",
             (req.studentId,)
         ).fetchone()
         
@@ -138,8 +138,9 @@ async def process_graduation(req: GraduationProcessRequest):
 async def get_graduation_status(user_id: str):
     """Get graduation status for a student"""
     with get_conn() as conn:
+        # FIX: users table has no 'name' column — query students directly
         student = conn.execute(
-            "SELECT s.*, u.name FROM students s JOIN users u ON s.user_id = u.id WHERE s.user_id = ?",
+            "SELECT s.* FROM students s WHERE s.user_id = ?",
             (user_id,)
         ).fetchone()
         
@@ -147,8 +148,9 @@ async def get_graduation_status(user_id: str):
             return {"error": "Student not found"}
         
         # Get completed courses
+        # FIX: 'code' is on courses (cs), not classes (c)
         completed = conn.execute("""
-            SELECT e.*, c.code, cs.title as name, cs.required
+            SELECT e.*, cs.code, cs.title as name, cs.required
             FROM enrollments e
             JOIN classes c ON e.class_id = c.id
             JOIN courses cs ON c.course_id = cs.id
@@ -156,8 +158,9 @@ async def get_graduation_status(user_id: str):
         """, (student['id'],)).fetchall()
         
         # Get failed courses
+        # FIX: 'code' is on courses (cs), not classes (c)
         failed = conn.execute("""
-            SELECT e.*, c.code, cs.title as name
+            SELECT e.*, cs.code, cs.title as name
             FROM enrollments e
             JOIN classes c ON e.class_id = c.id
             JOIN courses cs ON c.course_id = cs.id
