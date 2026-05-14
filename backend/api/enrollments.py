@@ -112,6 +112,7 @@ async def enroll_student(req: EnrollmentRequest):
 async def drop_enrollment(req: DropEnrollmentRequest):
     """Drop an enrollment and promote the next waitlisted student if applicable"""
     with get_conn() as conn:
+        # FIX: 'code' is on courses (cs), not classes (c) — corrected JOIN order too
         enrollment = conn.execute(
             """SELECT e.*, cs.code, e.class_id, c.capacity
                FROM enrollments e
