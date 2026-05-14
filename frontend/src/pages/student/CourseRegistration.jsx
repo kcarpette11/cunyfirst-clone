@@ -147,8 +147,8 @@ export default function CourseRegistration({ navigate }) {
             rows={enrolled.map(e => [
               e.code,
               e.name,
-              e.time,
-              e.instructorName || '?',
+              e.class_time,
+              e.instructor_name || '?',
               canRegister ? (
                 <Btn key="d" variant="danger" onClick={() => drop(e.enrollmentId, e.code)}>
                   Drop

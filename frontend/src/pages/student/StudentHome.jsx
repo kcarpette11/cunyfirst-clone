@@ -224,7 +224,7 @@ export default function StudentHome({ navigate }) {
               e.code || '?',
               e.name || '?',
               e.class_time || '?',
-              e.instructorName || '?',
+              e.instructor_name || '?',
               e.grade ? <Tag key="g" color={e.grade === 'F' ? 'var(--danger)' : 'var(--success)'}>{e.grade}</Tag> : <Tag key="g" color="var(--muted)">In Progress</Tag>
             ])}
           />
