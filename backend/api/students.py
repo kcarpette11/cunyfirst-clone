@@ -19,7 +19,7 @@ async def get_all_students():
         """).fetchall()
         
         return {"students": [dict(s) for s in students]}
-
+        
 @router.get("/api/students/top-gpa")
 async def get_top_gpa_students(limit: int = 3):
     """Get students with highest GPA"""
@@ -151,11 +151,8 @@ async def get_academic_history(user_id: int):
         
         return {"history": result}
 
-<<<<<<< HEAD
         
 
-=======
->>>>>>> fb6c3a636c258ac429b807172c495a979d4672a5
 @router.post("/api/student/use-honor")
 async def use_honor_credit(student_id: str):
     """Use an honor credit to remove a warning"""

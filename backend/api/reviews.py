@@ -10,7 +10,6 @@ router = APIRouter()
 async def submit_review(req: ReviewRequest):
     """Submit a review for a class"""
     with get_conn() as conn:
-<<<<<<< HEAD
         # FIRST: Get the actual student ID from the user_id
         student = conn.execute(
             "SELECT id FROM students WHERE user_id = ?", (req.studentId,)
@@ -20,19 +19,12 @@ async def submit_review(req: ReviewRequest):
             return {"success": False, "message": "Student not found"}
         
         # Check if student is enrolled using the student's internal ID
-=======
-        # Check if student is enrolled
->>>>>>> fb6c3a636c258ac429b807172c495a979d4672a5
         enrollment = conn.execute("""
             SELECT e.*, c.instructor_id 
             FROM enrollments e
             JOIN classes c ON e.class_id = c.id
             WHERE e.student_id = ? AND e.class_id = ? AND e.status = 'registered'
-<<<<<<< HEAD
         """, (student['id'], req.classId)).fetchone()
-=======
-        """, (req.studentId, req.classId)).fetchone()
->>>>>>> fb6c3a636c258ac429b807172c495a979d4672a5
         
         if not enrollment:
             return {"success": False, "message": "You are not enrolled in this class"}
@@ -44,11 +36,7 @@ async def submit_review(req: ReviewRequest):
         # Check if already reviewed
         existing = conn.execute(
             "SELECT * FROM reviews WHERE student_id = ? AND class_id = ?",
-<<<<<<< HEAD
             (student['id'], req.classId)
-=======
-            (req.studentId, req.classId)
->>>>>>> fb6c3a636c258ac429b807172c495a979d4672a5
         ).fetchone()
         
         if existing:
@@ -70,7 +58,6 @@ async def submit_review(req: ReviewRequest):
             if tw in text_lower:
                 processed_text = processed_text.replace(tw, '*' * len(tw))
         
-<<<<<<< HEAD
         # Insert review (use student['id'], not req.studentId)
         conn.execute("""
             INSERT INTO reviews (student_id, class_id, stars, text, shown, author_warned, semester, created_at)
@@ -78,15 +65,6 @@ async def submit_review(req: ReviewRequest):
         """, (student['id'], req.classId, req.stars, processed_text, 1 if shown else 0, 1 if author_warned else 0))
         
         # Issue warnings if needed (use req.studentId for user_id)
-=======
-        # Insert review
-        conn.execute("""
-            INSERT INTO reviews (student_id, class_id, stars, text, shown, author_warned, semester, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, (SELECT value FROM settings WHERE key = 'semester'), datetime('now'))
-        """, (req.studentId, req.classId, req.stars, processed_text, 1 if shown else 0, 1 if author_warned else 0))
-        
-        # Issue warnings if needed
->>>>>>> fb6c3a636c258ac429b807172c495a979d4672a5
         if taboo_count >= 3:
             conn.execute("UPDATE students SET warnings = warnings + 2 WHERE user_id = ?", (req.studentId,))
             message = "Review hidden due to 3+ taboo words. 2 warnings issued."
