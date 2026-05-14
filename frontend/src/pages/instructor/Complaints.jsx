@@ -1,22 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../auth.jsx';
-import {
-  PageTitle,
-  Card,
-  Select,
-  Textarea,
-  Btn,
-  Alert,
-  Table,
-  Tag,
-  SectionTitle
-} from '../../components/UI.jsx';
+import { PageTitle, Card, Select, Textarea, Btn, Alert, Table, Tag, SectionTitle } from '../../components/UI.jsx';
 
 const API_BASE = 'http://localhost:8000';
 
 export default function InstructorComplaints({ navigate }) {
   const { currentUser } = useAuth();
-
   const [loading, setLoading] = useState(true);
   const [myStudents, setMyStudents] = useState([]);
   const [myComplaints, setMyComplaints] = useState([]);
@@ -30,49 +19,35 @@ export default function InstructorComplaints({ navigate }) {
   const showMsg = (text, type = 'info') => {
     setMsg(text);
     setMsgType(type);
-
-    setTimeout(() => {
-      setMsg('');
-    }, 4000);
+    setTimeout(() => setMsg(''), 4000);
   };
 
   const fetchData = async () => {
     if (!currentUser) return;
-
     try {
       setLoading(true);
 
-      const classesRes = await fetch(
-        `${API_BASE}/api/instructor/${currentUser.id}/classes`
-      );
-
+      const classesRes = await fetch(`${API_BASE}/api/instructor/${currentUser.id}/classes`);
       const classesData = await classesRes.json();
 
-      // Build unique student list using user_id
+      // Use user_id as the complaint target ID, not the students table PK
       const studentsSet = new Map();
-
       for (const cls of classesData.classes || []) {
         for (const student of cls.students || []) {
           const key = student.user_id ?? student.id;
-
           if (!studentsSet.has(key)) {
             studentsSet.set(key, {
-              id: key,
+              id: key,           // user_id — what complaints.against_id expects
               name: student.name,
               student_code: student.student_code
             });
           }
         }
       }
-
       setMyStudents(Array.from(studentsSet.values()));
 
-      const complaintsRes = await fetch(
-        `${API_BASE}/api/complaints/instructor/${String(currentUser.id)}`
-      );
-
+      const complaintsRes = await fetch(`${API_BASE}/api/complaints/instructor/${String(currentUser.id)}`);
       const complaintsData = await complaintsRes.json();
-
       setMyComplaints(complaintsData.complaints || []);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -88,49 +63,31 @@ export default function InstructorComplaints({ navigate }) {
 
   const submit = async () => {
     if (!againstId || !text.trim()) {
-      showMsg(
-        'Please select a student and enter a description.',
-        'danger'
-      );
+      showMsg('Please select a student and enter a description.', 'danger');
       return;
     }
-
     setSubmitting(true);
-
     try {
-      const response = await fetch(
-        `${API_BASE}/api/complaint/submit`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            from_id: String(currentUser.id),
-            from_role: 'instructor',
-            against_id: String(againstId),
-            text: text
-          })
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/complaint/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_id: String(currentUser.id),
+          from_role: 'instructor',
+          against_id: String(againstId),
+          text: text
+        })
+      });
 
       const result = await response.json();
 
       if (result.success) {
-        showMsg(
-          'Complaint filed. The registrar will review and take action.',
-          'success'
-        );
-
+        showMsg('Complaint filed. The registrar will review and take action.', 'success');
         setAgainstId('');
         setText('');
-
         setRefreshTrigger(prev => prev + 1);
       } else {
-        showMsg(
-          result.message || 'Failed to submit complaint',
-          'danger'
-        );
+        showMsg(result.message || 'Failed to submit complaint', 'danger');
       }
     } catch (error) {
       console.error('Failed to submit complaint:', error);
@@ -150,57 +107,25 @@ export default function InstructorComplaints({ navigate }) {
 
   return (
     <div>
-      <PageTitle sub="File complaints about students in your classes">
-        Complaints
-      </PageTitle>
-
-      {msg && (
-        <Alert type={msgType}>
-          {msg}
-        </Alert>
-      )}
+      <PageTitle sub="File complaints about students in your classes">Complaints</PageTitle>
+      {msg && <Alert type={msgType}>{msg}</Alert>}
 
       <Card style={{ marginBottom: '1.5rem' }}>
-        <SectionTitle>
-          File a Complaint
-        </SectionTitle>
-
-        <p
-          style={{
-            color: 'var(--muted)',
-            fontSize: '13px',
-            marginBottom: '1rem',
-            lineHeight: 1.5
-          }}
-        >
-          You may file complaints about students in your classes.
-          The registrar must take action:
+        <SectionTitle>File a Complaint</SectionTitle>
+        <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '1rem', lineHeight: 1.5 }}>
+          You may file complaints about students in your classes. The registrar must take action:
           either punish the student or warn you for an unfounded complaint.
         </p>
-
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem'
-          }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <Select
             label="Student"
             value={againstId}
             onChange={setAgainstId}
             options={[
-              {
-                value: '',
-                label: '— Select Student —'
-              },
-              ...myStudents.map(s => ({
-                value: String(s.id),
-                label: `${s.name} (${s.student_code})`
-              }))
+              { value: '', label: '— Select Student —' },
+              ...myStudents.map(s => ({ value: String(s.id), label: `${s.name} (${s.student_code})` }))
             ]}
           />
-
           <Textarea
             label="Description"
             value={text}
@@ -208,45 +133,20 @@ export default function InstructorComplaints({ navigate }) {
             rows={4}
             placeholder="Describe the student's behavior or academic misconduct..."
           />
-
-          <Btn
-            variant="primary"
-            onClick={submit}
-            disabled={submitting}
-          >
+          <Btn variant="primary" onClick={submit} disabled={submitting}>
             {submitting ? 'Submitting...' : 'Submit Complaint'}
           </Btn>
         </div>
       </Card>
 
       <Card>
-        <SectionTitle>
-          My Filed Complaints
-        </SectionTitle>
-
+        <SectionTitle>My Filed Complaints</SectionTitle>
         <Table
-          headers={[
-            'Against',
-            'Status',
-            'Resolution',
-            'Date'
-          ]}
+          headers={['Against', 'Status', 'Resolution', 'Date']}
           rows={myComplaints.map(c => [
             c.against_name || '?',
-
-            <Tag
-              key="s"
-              color={
-                c.status === 'pending'
-                  ? 'var(--warn)'
-                  : 'var(--success)'
-              }
-            >
-              {c.status}
-            </Tag>,
-
+            <Tag key="s" color={c.status === 'pending' ? 'var(--warn)' : 'var(--success)'}>{c.status}</Tag>,
             c.resolution || '—',
-
             new Date(c.created_at).toLocaleDateString()
           ])}
           emptyMsg="No complaints filed."
