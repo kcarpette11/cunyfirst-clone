@@ -118,8 +118,9 @@ async def get_academic_history(user_id: int):
         
         grade_points = {'A': 4.0, 'B': 3.0, 'C': 2.0, 'D': 1.0, 'F': 0.0}
         
+        # FIX: 'code' is on courses (cs), not classes (c)
         history = conn.execute("""
-            SELECT e.semester, e.grade, c.code, cs.title as name
+            SELECT e.semester, e.grade, cs.code, cs.title as name
             FROM enrollments e
             JOIN classes c ON e.class_id = c.id
             JOIN courses cs ON c.course_id = cs.id
