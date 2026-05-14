@@ -57,7 +57,16 @@ CunyZero is a full-stack college management demo built with React, FastAPI, and 
 
 # Key Commands
 
-## Backend
+## Create .env file
+
+#### On Mac/Linux: 
+- cp .env.example .env
+
+#### On Windows (PowerShell):
+
+Copy-Item .env.example .env
+
+## Create Virtual Environment File
 
 - cd backend
 - python -m venv venv
