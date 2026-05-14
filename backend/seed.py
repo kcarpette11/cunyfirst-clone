@@ -83,6 +83,9 @@ def seed():
         # Get IDs
         instructor_ids = [r["id"] for r in conn.execute("SELECT id FROM instructors").fetchall()]
         student_ids = [r["id"] for r in conn.execute("SELECT id FROM students").fetchall()]
+        # user_id FK values (what complaints table actually references via users.id)
+        instructor_user_ids = [r["user_id"] for r in conn.execute("SELECT user_id FROM instructors").fetchall()]
+        student_user_ids = [r["user_id"] for r in conn.execute("SELECT user_id FROM students").fetchall()]
         course_ids = {r["code"]: r["id"] for r in conn.execute("SELECT id, code FROM courses").fetchall()}
 
         # Classes - EXPANDED with more classes and instructor assignments
@@ -338,21 +341,15 @@ def seed():
             )
         """)
         
-        # Sample complaints
-        complaint_data = [
-            (student_ids[0], "student", instructor_ids[0], "instructor", "The instructor was often late to class and did not provide clear feedback on assignments.", "pending"),
-            (student_ids[1], "student", instructor_ids[1], "instructor", "Course materials were not organized properly.", "pending"),
-            (student_ids[2], "student", instructor_ids[2], "instructor", "Grading was inconsistent across assignments.", "resolved"),
-            (student_ids[5], "student", student_ids[7], "student", "Group project teammate did not contribute equally.", "pending"),
-            (instructor_ids[3], "instructor", student_ids[4], "student", "Student has repeatedly missed deadlines without communication.", "pending"),
-        ]
-        for from_id, from_role, against_id, against_role, text, status in complaint_data:
-            conn.execute("""
-                INSERT INTO complaints (from_id, from_role, against_id, against_role, text, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-            """, (from_id, from_role, against_id, against_role, text, status))
+        # Helper: look up users.id by username — avoids any array-index confusion
+        def uid(username):
+            row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+            return row["id"] if row else None
+
+# No preset complaints — complaints are submitted live by students and instructors.
 
         # Knowledge base
+        
         knowledge = [
             ("all", "College0 overview", "College0 is an AI-enabled online college program management system for registrars, instructors, students, and visitors."),
             ("visitor", "How to apply", "Visitors can apply as students or instructors. Student applications should be accepted when GPA is above 3.0 and quota is not full."),
