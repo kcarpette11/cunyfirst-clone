@@ -187,6 +187,6 @@ async def get_graduation_status(user_id: str):
             "completedRequired": [dict(c) for c in completed_required],
             "missingRequired": [dict(m) for m in missing_required],
             "existingApp": dict(existing_app) if existing_app else None,
-            "canApply": len(completed) >= 8 and len(missing_required) == 0 and not existing_app and not student.get('graduated'),
-            "isGraduated": student.get('graduated', False)
+            "canApply": len(completed) >= 8 and len(missing_required) == 0 and not existing_app and not (student['graduated'] if 'graduated' in student.keys() else False),
+            "isGraduated": student['graduated'] if 'graduated' in student.keys() else False
         }

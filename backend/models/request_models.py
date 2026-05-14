@@ -40,7 +40,7 @@ class EnrollmentRequest(BaseModel):
     semester: int = 1
 
 class DropEnrollmentRequest(BaseModel):
-    enrollmentId: int
+    enrollment_id: int  # FIX: renamed from enrollmentId to snake_case
 
 class AdmitWaitlistRequest(BaseModel):
     enrollmentId: int

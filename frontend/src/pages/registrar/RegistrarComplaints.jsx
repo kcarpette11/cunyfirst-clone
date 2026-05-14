@@ -43,7 +43,7 @@ export default function RegistrarComplaints({ navigate }) {
     }
   };
 
-  useEffect(() => {
+useEffect(() => {
     fetchData();
   }, [refreshTrigger]);
 
