@@ -11,7 +11,7 @@ import RegistrarHome from './pages/registrar/RegistrarHome.jsx';
 import Applications from './pages/registrar/Applications.jsx';
 import SemesterControl from './pages/registrar/SemesterControl.jsx';
 import ClassSetup from './pages/registrar/ClassSetup.jsx';
-import RegistrarComplaints from './pages/registrar/Complaints.jsx';
+import RegistrarComplaints from './pages/registrar/RegistrarComplaints.jsx';
 import TabooWords from './pages/registrar/TabooWords.jsx';
 import GradeReview from './pages/registrar/GradeReview.jsx';
 
@@ -19,13 +19,13 @@ import GradeReview from './pages/registrar/GradeReview.jsx';
 import InstructorHome from './pages/instructor/InstructorHome.jsx';
 import MyClasses from './pages/instructor/MyClasses.jsx';
 import Grades from './pages/instructor/Grades.jsx';
-import InstructorComplaints from './pages/instructor/Complaints.jsx';
+import InstructorComplaints from './pages/instructor/InstructorComplaints.jsx';
 
 // Student pages
 import StudentHome from './pages/student/StudentHome.jsx';
 import CourseRegistration from './pages/student/CourseRegistration.jsx';
 import MyReviews from './pages/student/MyReviews.jsx';
-import StudentComplaints from './pages/student/Complaints.jsx';
+import StudentComplaints from './pages/student/StudentComplaints.jsx';
 import Graduation from './pages/student/Graduation.jsx';
 
 const styles = {

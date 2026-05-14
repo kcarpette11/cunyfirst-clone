@@ -155,20 +155,3 @@ export default function InstructorComplaints({ navigate }) {
     </div>
   );
 }
-
-      <Card>
-        <SectionTitle>My Filed Complaints</SectionTitle>
-        <Table
-          headers={['Against', 'Status', 'Resolution', 'Date']}
-          rows={myComplaints.map(c => [
-            c.against_name || '?',
-            <Tag key="s" color={c.status === 'pending' ? 'var(--warn)' : 'var(--success)'}>{c.status}</Tag>,
-            c.resolution || '—',
-            new Date(c.created_at).toLocaleDateString()
-          ])}
-          emptyMsg="No complaints filed."
-        />
-      </Card>
-    </div>
-  );
-}
