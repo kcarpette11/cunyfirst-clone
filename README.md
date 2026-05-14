@@ -78,6 +78,7 @@ CunyZero is a full-stack college management demo built with React, FastAPI, and 
 
 ## Reset DB
 
+- cd backend 
 - python seed.py (populate database/reset database)
 
 ## Backend
