@@ -37,24 +37,33 @@ async def submit_complaint(complaint: ComplaintSubmit):
 async def get_all_complaints():
     """Get all complaints (pending and resolved)"""
     with get_conn() as conn:
+        # FIX: users table has no 'name' column — resolve names via students/instructors
         pending = conn.execute("""
-            SELECT c.*, 
-                   u1.name as from_name, u1.role as from_role_display,
-                   u2.name as against_name, u2.role as against_role_display
+            SELECT c.*,
+                   COALESCE(s1.name, i1.name, u1.username) as from_name, u1.role as from_role_display,
+                   COALESCE(s2.name, i2.name, u2.username) as against_name, u2.role as against_role_display
             FROM complaints c
             JOIN users u1 ON c.from_id = u1.id
             JOIN users u2 ON c.against_id = u2.id
+            LEFT JOIN students s1 ON u1.id = s1.user_id
+            LEFT JOIN instructors i1 ON u1.id = i1.user_id
+            LEFT JOIN students s2 ON u2.id = s2.user_id
+            LEFT JOIN instructors i2 ON u2.id = i2.user_id
             WHERE c.status = 'pending'
             ORDER BY c.created_at DESC
         """).fetchall()
         
         resolved = conn.execute("""
-            SELECT c.*, 
-                   u1.name as from_name, u1.role as from_role_display,
-                   u2.name as against_name, u2.role as against_role_display
+            SELECT c.*,
+                   COALESCE(s1.name, i1.name, u1.username) as from_name, u1.role as from_role_display,
+                   COALESCE(s2.name, i2.name, u2.username) as against_name, u2.role as against_role_display
             FROM complaints c
             JOIN users u1 ON c.from_id = u1.id
             JOIN users u2 ON c.against_id = u2.id
+            LEFT JOIN students s1 ON u1.id = s1.user_id
+            LEFT JOIN instructors i1 ON u1.id = i1.user_id
+            LEFT JOIN students s2 ON u2.id = s2.user_id
+            LEFT JOIN instructors i2 ON u2.id = i2.user_id
             WHERE c.status = 'resolved'
             ORDER BY c.created_at DESC
             LIMIT 50
@@ -69,13 +78,18 @@ async def get_all_complaints():
 async def get_pending_complaints():
     """Get only pending complaints"""
     with get_conn() as conn:
+        # FIX: users table has no 'name' column — resolve names via students/instructors
         complaints = conn.execute("""
-            SELECT c.*, 
-                   u1.name as from_name, u1.role as from_role_display,
-                   u2.name as against_name, u2.role as against_role_display
+            SELECT c.*,
+                   COALESCE(s1.name, i1.name, u1.username) as from_name, u1.role as from_role_display,
+                   COALESCE(s2.name, i2.name, u2.username) as against_name, u2.role as against_role_display
             FROM complaints c
             JOIN users u1 ON c.from_id = u1.id
             JOIN users u2 ON c.against_id = u2.id
+            LEFT JOIN students s1 ON u1.id = s1.user_id
+            LEFT JOIN instructors i1 ON u1.id = i1.user_id
+            LEFT JOIN students s2 ON u2.id = s2.user_id
+            LEFT JOIN instructors i2 ON u2.id = i2.user_id
             WHERE c.status = 'pending'
             ORDER BY c.created_at DESC
         """).fetchall()
@@ -180,7 +194,7 @@ async def get_instructor_complaints(user_id: int):
     """Get complaints filed by an instructor"""
     with get_conn() as conn:
         complaints = conn.execute("""
-            SELECT c.*, 
+            SELECT c., 
                    COALESCE(s.name, i.name, u.username) as against_name,
                    c.against_role
             FROM complaints c
