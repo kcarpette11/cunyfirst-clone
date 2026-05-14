@@ -84,7 +84,7 @@ CunyZero is a full-stack college management demo built with React, FastAPI, and 
 ## Backend
 
 - pip install -r requirements.txt
-- uvicorn ai_assistant:app --reload --port 8000
+- uvicorn main:app --reload --port 8000
 
 ## Frontend
 
