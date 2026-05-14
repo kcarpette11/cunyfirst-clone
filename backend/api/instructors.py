@@ -75,7 +75,7 @@ async def get_instructor_classes(user_id: int):
         for cls in classes:
             students = conn.execute("""
                 SELECT e.id as enrollment_id, e.status, e.grade,
-                       s.id, s.student_code, s.name, s.email, s.gpa
+                       s.id, s.user_id, s.student_code, s.name, s.email, s.gpa
                 FROM enrollments e
                 JOIN students s ON e.student_id = s.id
                 WHERE e.class_id = ? AND e.status IN ('registered', 'waitlisted')
