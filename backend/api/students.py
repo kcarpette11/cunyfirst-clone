@@ -151,8 +151,11 @@ async def get_academic_history(user_id: int):
         
         return {"history": result}
 
+<<<<<<< HEAD
         
 
+=======
+>>>>>>> fb6c3a636c258ac429b807172c495a979d4672a5
 @router.post("/api/student/use-honor")
 async def use_honor_credit(student_id: str):
     """Use an honor credit to remove a warning"""
