@@ -2,6 +2,69 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../auth.jsx';
 import { Card, Btn, Textarea, Alert } from './UI.jsx';
 
+// Simple markdown renderer — no external deps needed
+function MarkdownText({ text }) {
+  const lines = text.split('\n');
+  const elements = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Heading ##
+    if (line.startsWith('### ')) {
+      elements.push(<div key={i} style={{ fontWeight: 700, fontSize: '13px', marginTop: '0.6rem', marginBottom: '0.2rem' }}>{renderInline(line.slice(4))}</div>);
+    } else if (line.startsWith('## ')) {
+      elements.push(<div key={i} style={{ fontWeight: 700, fontSize: '14px', marginTop: '0.7rem', marginBottom: '0.3rem', borderBottom: '1px solid var(--border)', paddingBottom: '2px' }}>{renderInline(line.slice(3))}</div>);
+    } else if (line.startsWith('# ')) {
+      elements.push(<div key={i} style={{ fontWeight: 700, fontSize: '15px', marginTop: '0.8rem', marginBottom: '0.3rem' }}>{renderInline(line.slice(2))}</div>);
+    // Horizontal rule ---
+    } else if (/^---+$/.test(line.trim())) {
+      elements.push(<hr key={i} style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0.5rem 0' }} />);
+    // Bullet point
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      elements.push(
+        <div key={i} style={{ display: 'flex', gap: '0.4rem', marginTop: '2px' }}>
+          <span style={{ color: 'var(--accent)', flexShrink: 0 }}>•</span>
+          <span>{renderInline(line.slice(2))}</span>
+        </div>
+      );
+    // Numbered list
+    } else if (/^\d+\.\s/.test(line)) {
+      const match = line.match(/^(\d+)\.\s(.*)/);
+      elements.push(
+        <div key={i} style={{ display: 'flex', gap: '0.4rem', marginTop: '2px' }}>
+          <span style={{ color: 'var(--accent)', flexShrink: 0, minWidth: '16px' }}>{match[1]}.</span>
+          <span>{renderInline(match[2])}</span>
+        </div>
+      );
+    // Empty line = spacing
+    } else if (line.trim() === '') {
+      elements.push(<div key={i} style={{ height: '0.4rem' }} />);
+    // Normal text
+    } else {
+      elements.push(<div key={i}>{renderInline(line)}</div>);
+    }
+    i++;
+  }
+  return <div style={{ lineHeight: '1.6' }}>{elements}</div>;
+}
+
+function renderInline(text) {
+  // Bold **text** and *text*, inline code `code`
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    } else if (part.startsWith('*') && part.endsWith('*')) {
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    } else if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i} style={{ background: 'var(--surface)', padding: '1px 4px', borderRadius: '3px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
+}
+
 const API_BASE = 'http://localhost:8000';
 
 export default function AIChat() {
@@ -163,7 +226,7 @@ export default function AIChat() {
               fontSize: '13px', fontFamily: 'var(--font-body)',
               border: m.role !== 'user' ? '1px solid var(--border)' : 'none',
             }}>
-              {m.text}
+              {m.role === 'assistant' ? <MarkdownText text={m.text} /> : m.text}
               {m.hallucination_warning && (
                 <div style={{ marginTop: '0.4rem', fontSize: '10px', color: 'var(--warn)', fontFamily: 'var(--font-mono)' }}>
                   ⚠ Answer from general LLM — may not reflect CunyZero specifics. Verify with registrar.
