@@ -48,6 +48,9 @@ npm install
 npm run dev
 
 ---
+## Reset Database
+cd backend
+python seed.py
 
 ## Demo Logins
 | Role       | Username   | Password    |
@@ -65,10 +68,6 @@ npm run dev
 4. **Instructor** – Manage waitlists, post grades, view rosters
 5. **Student** – Register for courses, submit reviews, file complaints, apply for graduation
 6. **AI Assistant** – Ask questions about College0 policies and rules
-
-## Reset Database
-cd backend
-python seed.py
 
 ## Project Structure
 | File                   | Purpose                                  |
