@@ -8,6 +8,11 @@
 *.swo
 *.bak
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Environment files
 .env
 .env.local
