@@ -7,50 +7,63 @@ CunyZero is a local GUI college-management demo built for the rubric/checklist. 
 - Python (3.10+)
 - SQLite3
 
-## Setup
-
-### 1. Create virtual environment
+## Setup the backend
+```bash
 cd backend
+```
+### 1. Create virtual environment
+```bash
 python -m venv venv
-
+```
 ### 2. Activate virtual environment
 On Mac/Linux:
+```bash
 source venv/bin/activate
-
+```
 On Windows (PowerShell):
+```bash
 venv\Scripts\activate.ps1
-
+```
 On Windows (Command Prompt):
+```bash
 venv\Scripts\activate.bat
-
+```
 ### 3. Install dependencies
+```bash
 pip install -r requirements.txt
-
+```
 ### 4. Set up environment variables
 On Mac/Linux:
+```bash
 cp .env.example .env
-
+```
 On Windows (PowerShell):
+```bash
 Copy-Item .env.example .env
-
+```
 Then open .env and add your Anthropic API key:
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 
 ### 6. Seed the database
+```bash
 python seed.py
-
+```
 ### 7. Start the backend
+```bash
 uvicorn main:app --reload --port 8000
+```
 
 ### 8. Start the frontend (new terminal)
+```bash
 cd frontend
 npm install
 npm run dev
-
+```
 ---
 ## Reset Database
-cd backend
+```bash
 python seed.py
+```
 
 ## Demo Logins
 | Role       | Username   | Password    |
