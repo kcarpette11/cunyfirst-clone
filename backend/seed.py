@@ -7,16 +7,17 @@ def seed():
     init_db()
     
     with get_conn() as conn:
-        # Settings
+        
+        # ===== Settings ================================================================
         conn.execute("INSERT INTO settings(key,value) VALUES('period','registration')")
         conn.execute("INSERT INTO settings(key,value) VALUES('semester','1')")
         conn.execute("INSERT INTO settings(key,value) VALUES('program_quota','20')")
-
-        # Users
+        
+        # ===== Users ===================================================================
         conn.execute("INSERT INTO users(username,password,role) VALUES('registrar','admin123','registrar')")
         conn.execute("INSERT INTO users(username,password,role) VALUES('dean','dean123','registrar')")
-
-        # Instructors
+        
+        # ===== Instructors ==============================================================
         instructors = [
             ("inst_lee", "pass123", "Dr. Lee", "lee@college0.edu"),
             ("inst_khan", "pass123", "Prof. Khan", "khan@college0.edu"),
@@ -32,8 +33,8 @@ def seed():
                                (username, password, "instructor"))
             conn.execute("INSERT INTO instructors(user_id,name,email,warnings,suspended,fired) VALUES(?,?,?,0,0,0)", 
                          (cur.lastrowid, name, email))
-
-        # Students
+        
+        # ===== Students =================================================================
         students = [
             ("alice", "alice123", "S001", "Alice Johnson", 3.91, 3.91, 0, 0, 0, 0, 0),
             ("ben", "ben123", "S002", "Ben Martinez", 3.20, 3.20, 0, 0, 0, 0, 0),
@@ -58,7 +59,7 @@ def seed():
             """, (cur.lastrowid, code, name, f"{code.lower()}@college0.edu", 
                   gpa, sem_gpa, warnings, honor, 0, 0, suspended, interview, terminated))
 
-        # Courses
+        # ===== Courses ==================================================================
         courses = [
             ("CS101", "Intro to Computing", 1, "Basic programming concepts"),
             ("CS201", "Data Structures", 1, "Arrays, lists, trees, and algorithms"),
@@ -77,14 +78,14 @@ def seed():
             conn.execute("INSERT INTO courses(code,title,required,description) VALUES(?,?,?,?)", 
                          (code, title, required, desc))
 
-        # Get IDs
+        # ===== Get DB IDs =============================================================
         instructor_ids = [r["id"] for r in conn.execute("SELECT id FROM instructors").fetchall()]
         student_ids = [r["id"] for r in conn.execute("SELECT id FROM students").fetchall()]
         instructor_user_ids = [r["user_id"] for r in conn.execute("SELECT user_id FROM instructors").fetchall()]
         student_user_ids = [r["user_id"] for r in conn.execute("SELECT user_id FROM students").fetchall()]
         course_ids = {r["code"]: r["id"] for r in conn.execute("SELECT id, code FROM courses").fetchall()}
 
-        # Classes
+        # ===== Classes (Course Offerings) ========================================================
         class_data = [
             ("CS101", instructor_ids[0], "Mon/Wed 9-10:30am", 5, 4.0),
             ("CS201", instructor_ids[1], "Tue/Thu 11am-12:30pm", 5, 4.0),
@@ -108,7 +109,7 @@ def seed():
             """, (course_id, inst, time, cap, rating))
             class_ids.append(cur.lastrowid)
 
-        # Enrollments
+        # ===== Enrollments ==============================================================
         for sid, cid in [(student_ids[0], class_ids[0]), (student_ids[0], class_ids[1]), (student_ids[0], class_ids[2])]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, cid))
         for sid, cid in [(student_ids[1], class_ids[0]), (student_ids[1], class_ids[2]), (student_ids[1], class_ids[3])]:
@@ -120,7 +121,7 @@ def seed():
         for sid, cid in [(student_ids[4], class_ids[0]), (student_ids[4], class_ids[3])]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, cid))
 
-        # Additional enrollments
+        # ===== Additional enrollments ====================================================
         for cid in [class_ids[4], class_ids[5]]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (student_ids[0], cid))
         for cid in [class_ids[4], class_ids[6]]:
@@ -128,7 +129,7 @@ def seed():
         for cid in [class_ids[5], class_ids[7]]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (student_ids[2], cid))
 
-        # New students enrollments
+        # ===== New students enrollments ==================================================
         for cid in [class_ids[4], class_ids[6], class_ids[8]]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (student_ids[5], cid))
         for cid in [class_ids[5], class_ids[7], class_ids[9]]:
@@ -140,36 +141,36 @@ def seed():
         for cid in [class_ids[8], class_ids[9]]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (student_ids[9], cid))
 
-        # Waitlist examples
+        # ===== Waitlist examples =========================================================
         conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'waitlisted')", (student_ids[9], class_ids[4]))
         conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'waitlisted')", (student_ids[7], class_ids[5]))
 
-        # Enroll all students in Dr. Lee's classes
+        # ===== Enroll all students in Dr. Lee's classes ==================================
         for sid in student_ids:
             conn.execute("INSERT OR IGNORE INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, class_ids[0]))
             conn.execute("INSERT OR IGNORE INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, class_ids[3]))
 
-        # ── MAKE BEN ELIGIBLE FOR GRADUATION ──────────────────────────
+        # ===== Making Ben eligible for graduation ========================================
         ben_student_id = student_ids[1]
 
-        # Clear Ben's existing enrollments
+        # ===== Clear Ben's existing enrollments ==========================================
         conn.execute("DELETE FROM enrollments WHERE student_id = ?", (ben_student_id,))
 
-        # Get all required course class IDs first
+        # ===== Get all required course class IDs first
         required_class_ids = [r["id"] for r in conn.execute("""
             SELECT c.id FROM classes c
             JOIN courses cs ON c.course_id = cs.id
             WHERE cs.required = 1
         """).fetchall()]
 
-        # Fill remaining slots with non-required classes
+        # ===== Fill remaining slots with non-required classes
         non_required_class_ids = [r["id"] for r in conn.execute("""
             SELECT c.id FROM classes c
             JOIN courses cs ON c.course_id = cs.id
             WHERE cs.required = 0
         """).fetchall()]
 
-        # All required first, then pad with electives to reach 8
+        # ===== All required first, then pad with electives to reach 8
         graduation_classes = required_class_ids + [
             cid for cid in non_required_class_ids if cid not in required_class_ids
         ]
@@ -181,7 +182,7 @@ def seed():
                 VALUES (?, ?, 1, 'registered', 'A')
             """, (ben_student_id, class_id))
 
-        # Update Ben's student record
+        # ===== Update Ben's student record =============================================================
         conn.execute("""
             UPDATE students 
             SET gpa = 3.75, semester_gpa = 3.8, honor_roll = 1,
@@ -189,19 +190,18 @@ def seed():
             WHERE id = ?
         """, (ben_student_id,))
 
-        # Add Ben's graduation application
+        # Add Ben's graduation application ============================================================
         conn.execute("""
             INSERT INTO graduation_apps (student_id, status, created_at)
             VALUES (?, 'pending', datetime('now'))
         """, (ben_student_id,))
-        # ──────────────────────────────────────────────────────────────
 
-        # Taboo words
+        # ===== Taboo words =================================================================
         taboo_words = ["badword", "inappropriate", "offensive", "trash", "stupid", "idiot", "hate", "useless", "terrible", "awful", "worst"]
         for word in taboo_words:
             conn.execute("INSERT OR IGNORE INTO taboo_words(word) VALUES(?)", (word,))
 
-        # Sample notifications
+        # Sample notifications ================================================================
         sample_notifications = [
             (student_user_ids[0], "Welcome to College0! Your account has been created.", "info"),
             (student_user_ids[0], "Registration for the new semester is now open!", "success"),
@@ -221,7 +221,7 @@ def seed():
                 VALUES (?, ?, ?, datetime('now'))
             """, (user_id, message, ntype))
 
-        # Grade justifications
+        # ===== Grade justifications ================================================================
         grade_justifications_data = [
             (instructor_ids[0], class_ids[0], "The class performed exceptionally well this semester due to extra study sessions and high motivation.", 0),
             (instructor_ids[1], class_ids[1], "Students struggled initially but showed great improvement. Grades reflect final performance.", 0),
@@ -233,12 +233,12 @@ def seed():
                 VALUES (?, ?, ?, ?)
             """, (inst_id, cls_id, justification, reviewed))
 
-        # Graduation applications (Alice pending, David approved, Grace rejected)
+        # ===== Graduation applications ================================================================
         conn.execute("INSERT INTO graduation_apps (student_id, status, created_at) VALUES (?, 'pending', datetime('now'))", (student_ids[0],))
         conn.execute("INSERT INTO graduation_apps (student_id, status, created_at) VALUES (?, 'approved', datetime('now', '-7 days'))", (student_ids[3],))
         conn.execute("INSERT INTO graduation_apps (student_id, status, created_at) VALUES (?, 'rejected', datetime('now', '-14 days'))", (student_ids[6],))
 
-        # Sample applications
+        # ===== Sample applications ================================================================
         sample_apps = [
             ("student", "John Smith", "john@email.com", 3.8, "Computer Science", "I have a strong background in programming and want to pursue AI."),
             ("student", "Mary Jones", "mary@email.com", 2.9, "Business", "Looking to enhance my career with a graduate degree."),
@@ -252,7 +252,7 @@ def seed():
                 VALUES (?, ?, ?, ?, ?, ?, 'pending')
             """, (app_type, name, email, gpa, program, statement))
 
-        # Knowledge base
+        # ===== Knowledge base ================================================================
         knowledge = [
             ("all", "College0 overview", "College0 is an AI-enabled online college program management system for registrars, instructors, students, and visitors."),
             ("visitor", "How to apply", "Visitors can apply as students or instructors. Student applications should be accepted when GPA is above 3.0 and quota is not full."),
@@ -270,6 +270,7 @@ def seed():
         for audience, title, body in knowledge:
             conn.execute("INSERT INTO knowledge(audience,title,body) VALUES(?,?,?)", (audience, title, body))
 
+    # ===== Summary Output instead of silent seeding ===========================================================
     print(f"\n✅ Seeded database at {DB_PATH}")
     print("📊 Data includes:")
     print("   - 8 instructors, 10 students")

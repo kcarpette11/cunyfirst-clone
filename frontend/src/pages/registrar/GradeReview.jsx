@@ -13,7 +13,6 @@ export default function GradeReview({ navigate }) {
   const [msg, setMsg] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Fetch all data from backend
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -50,6 +49,10 @@ export default function GradeReview({ navigate }) {
   useEffect(() => {
     fetchData();
   }, [refreshTrigger]);
+
+  // ===== Actions =================================================================
+
+  // Issues a warning to the instructor, which is recorded in the database but does not affect their employment status
 
   const warn = async (instructorId, name) => {
     try {
@@ -101,8 +104,11 @@ export default function GradeReview({ navigate }) {
     }
   };
 
+  // Clears the flag on a class without penalizing the instructor
   const acceptJustification = async (classId, instructorId) => {
     try {
+      console.log('Accepting justification for class:', classId, 'instructor:', instructorId);
+
       const response = await fetch(`${API_BASE}/api/grade-justification/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,10 +116,15 @@ export default function GradeReview({ navigate }) {
       });
 
       const result = await response.json();
+      console.log('Response:', result);
 
       if (result.success) {
         setMsg('Justification accepted.');
-        setRefreshTrigger(prev => prev + 1);
+        console.log('Refreshing data...');
+        setRefreshTrigger(prev => {
+          console.log('Refresh trigger from', prev, 'to', prev + 1);
+          return prev + 1;
+        });
       } else {
         setMsg(`Error: ${result.message}`);
       }
@@ -126,11 +137,14 @@ export default function GradeReview({ navigate }) {
     }
   };
 
+  // ===== Helpers ==================================================================
+
   const getInstructorName = (instructorId) => {
     const instructor = instructors.find(i => i.id === instructorId);
     return instructor?.name || 'Unknown';
   };
 
+  // Returns the justification record for a class, or undefined if none submitted
   const getJustification = (classId) => {
     return justifications.find(j => j.class_id === classId);
   };
@@ -148,6 +162,7 @@ export default function GradeReview({ navigate }) {
       <PageTitle sub="Review courses with outlier GPAs">Grade Review</PageTitle>
       {msg && <Alert type="warn">{msg}</Alert>}
 
+      {/* ── Flagged Classes Card ─────────────────────────────────────────────── */}
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>⚠️ Flagged Classes (GPA outside 2.5–3.5)</SectionTitle>
         {flaggedClasses.length === 0 && (
@@ -157,6 +172,7 @@ export default function GradeReview({ navigate }) {
         )}
         {flaggedClasses.map(cls => {
           const justification = getJustification(cls.id);
+          // High GPA uses accent color; low GPA uses danger color throughout the card
           const isHighGPA = cls.class_gpa > 3.5;
 
           return (
@@ -169,6 +185,7 @@ export default function GradeReview({ navigate }) {
                 marginBottom: '0.75rem'
               }}
             >
+              {/* Class header: code + GPA tag, name, instructor */}
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                 <Tag color={isHighGPA ? 'var(--accent)' : 'var(--danger)'}>
                   {cls.code} — GPA {cls.class_gpa.toFixed(2)}
@@ -178,11 +195,15 @@ export default function GradeReview({ navigate }) {
                   Instructor: {getInstructorName(cls.instructor_id)}
                 </span>
               </div>
+
+              {/* Human-readable explanation of why this class was flagged */}
               <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '0.75rem' }}>
                 {isHighGPA
                   ? 'Class GPA is unusually HIGH (> 3.5). Possible grade inflation.'
                   : 'Class GPA is unusually LOW (< 2.5). Possible excessive failing.'}
               </div>
+
+              {/* Justification block — shows submitted text or a missing warning */}
               {justification ? (
                 <div style={{ background: 'var(--surface2)', borderRadius: '4px', padding: '0.6rem', fontSize: '13px', marginBottom: '0.75rem' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--success)' }}>
@@ -195,6 +216,8 @@ export default function GradeReview({ navigate }) {
                   No justification submitted yet.
                 </div>
               )}
+
+              {/* Action buttons: accept justification, warn, or fire the instructor */}
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <Btn variant="ghost" onClick={() => acceptJustification(cls.id, cls.instructor_id)}>
                   Accept Justification
@@ -214,11 +237,13 @@ export default function GradeReview({ navigate }) {
         })}
       </Card>
 
+      {/* ── All Class GPAs Table ─────────────────────────────────────────────── */}
       <Card>
         <SectionTitle>All Class GPAs — Semester {semesterNumber}</SectionTitle>
         <Table
           headers={['Code', 'Name', 'Instructor', 'Class GPA', 'Status']}
           rows={allClasses.map(c => {
+            // Flag if GPA exists and falls outside the 2.5–3.5 normal range
             const isFlagged = c.class_gpa !== null && (c.class_gpa > 3.5 || c.class_gpa < 2.5);
             return [
               c.code,

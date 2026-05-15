@@ -16,6 +16,9 @@ export default function InstructorComplaints({ navigate }) {
   const [submitting, setSubmitting] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // ===== Helpers =================================================================
+
+  // Convenience wrapper that sets the message and auto-clears after 4 seconds
   const showMsg = (text, type = 'info') => {
     setMsg(text);
     setMsgType(type);
@@ -30,14 +33,14 @@ export default function InstructorComplaints({ navigate }) {
       const classesRes = await fetch(`${API_BASE}/api/instructor/${currentUser.id}/classes`);
       const classesData = await classesRes.json();
 
-      // Use user_id as the complaint target ID, not the students table PK
+      // Deduplicate students across all assigned classes using user_id as the key
       const studentsSet = new Map();
       for (const cls of classesData.classes || []) {
         for (const student of cls.students || []) {
           const key = student.user_id ?? student.id;
           if (!studentsSet.has(key)) {
             studentsSet.set(key, {
-              id: key,           // user_id — what complaints.against_id expects
+              id: key,
               name: student.name,
               student_code: student.student_code
             });
@@ -61,7 +64,10 @@ export default function InstructorComplaints({ navigate }) {
     fetchData();
   }, [currentUser, refreshTrigger]);
 
+  // ===== Actions =================================================================
+
   const submit = async () => {
+    // Guard: both a target student and a description are required
     if (!againstId || !text.trim()) {
       showMsg('Please select a student and enter a description.', 'danger');
       return;
@@ -110,6 +116,7 @@ export default function InstructorComplaints({ navigate }) {
       <PageTitle sub="File complaints about students in your classes">Complaints</PageTitle>
       {msg && <Alert type={msgType}>{msg}</Alert>}
 
+      {/* ── File a Complaint Card ────────────────────────────────────────────── */}
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>File a Complaint</SectionTitle>
         <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '1rem', lineHeight: 1.5 }}>
@@ -139,6 +146,7 @@ export default function InstructorComplaints({ navigate }) {
         </div>
       </Card>
 
+      {/* ── Filed Complaints Table ───────────────────────────────────────────── */}
       <Card>
         <SectionTitle>My Filed Complaints</SectionTitle>
         <Table

@@ -1,10 +1,12 @@
-# api/semester.py - Semester control endpoints
 from fastapi import APIRouter, HTTPException
 from models.request_models import SetPeriodRequest
 from database import get_conn
 
 router = APIRouter()
+
 PERIODS = ['setup', 'registration', 'running', 'grading', 'closed']
+
+# ===== Semester Period Queries ===========================================================
 
 @router.get("/api/semester/period")
 async def get_semester_period():
@@ -20,6 +22,8 @@ async def get_semester_period():
             "quota": int(quota['value']) if quota else 20
         }
 
+# ===== Semester Period Advancement =======================================================
+
 @router.post("/api/semester/advance")
 async def advance_semester_period():
     """Advance to the next semester period"""
@@ -33,7 +37,6 @@ async def advance_semester_period():
             
             conn.execute("UPDATE settings SET value = ? WHERE key = 'period'", (next_period,))
             
-            # Run period-specific checks
             if next_period == 'running':
                 await _run_period_start_checks(conn)
             elif next_period == 'closed':
@@ -42,6 +45,10 @@ async def advance_semester_period():
             return {"success": True, "newPeriod": next_period}
         else:
             return {"success": False, "message": "Already at final period"}
+
+
+# ===== Semester Period Setting ======================================================
+
 
 @router.post("/api/semester/set-period")
 async def set_semester_period(req: SetPeriodRequest):
@@ -52,6 +59,10 @@ async def set_semester_period(req: SetPeriodRequest):
     with get_conn() as conn:
         conn.execute("UPDATE settings SET value = ? WHERE key = 'period'", (req.period,))
         return {"success": True, "newPeriod": req.period}
+
+
+# ===== New Semester Creation (End of Semester Processing) ======================================================
+
 
 @router.post("/api/semester/new")
 async def start_new_semester():
@@ -65,14 +76,16 @@ async def start_new_semester():
         conn.execute("UPDATE settings SET value = 'setup' WHERE key = 'period'")
         conn.execute("UPDATE settings SET value = ? WHERE key = 'semester'", (str(new_semester),))
         
-        # Reset suspension flags for new semester
         conn.execute("UPDATE users SET suspended = 0, suspended_next_semester = 0 WHERE suspended = 1")
         
         return {"success": True, "newSemester": new_semester}
 
+
+# ===== Period Start Checks (Running Period) ======================================================
+
+
 async def _run_period_start_checks(conn):
     """Run checks when entering running period"""
-    # Warn students with < 2 courses
     semester = conn.execute("SELECT value FROM settings WHERE key = 'semester'").fetchone()
     current_semester = int(semester['value']) if semester else 1
     
@@ -92,7 +105,6 @@ async def _run_period_start_checks(conn):
             """, (student['id'],))
             conn.execute("UPDATE students SET warnings = warnings + 1 WHERE id = ?", (student['id'],))
     
-    # Cancel courses with < 3 students
     classes = conn.execute("""
         SELECT c.*, i.user_id as instructor_user_id
         FROM classes c
@@ -114,42 +126,39 @@ async def _run_period_start_checks(conn):
                 VALUES (?, 'Your course has been cancelled due to low enrollment.', 'warn', datetime('now'))
             """, (cls['instructor_user_id'],))
             
-            # Drop enrolled students
             conn.execute("""
                 UPDATE enrollments SET status = 'dropped' 
                 WHERE class_id = ? AND status = 'registered'
             """, (cls['id'],))
 
+
+# ===== End of Semester Processing ======================================================
+
+
 async def _run_end_of_semester(conn):
     """Run end of semester processing"""
-    # Get current semester
     semester = conn.execute("SELECT value FROM settings WHERE key = 'semester'").fetchone()
     current_semester = int(semester['value']) if semester else 1
     new_semester = current_semester + 1
     
-    # Archive current enrollments as completed courses
     conn.execute("""
         UPDATE enrollments 
         SET status = 'completed' 
         WHERE semester = ? AND status = 'registered'
     """, (current_semester,))
-    
-    # Clear waitlists for next semester
+
     conn.execute("""
         UPDATE enrollments 
         SET status = 'dropped' 
         WHERE semester = ? AND status = 'waitlisted'
     """, (current_semester,))
     
-    # --- NEW: Copy active classes to next semester ---
-    # Get all active (not cancelled) classes from current semester
     active_classes = conn.execute("""
         SELECT course_id, instructor_id, class_time, capacity, avg_rating
         FROM classes 
         WHERE semester = ? AND cancelled = 0
     """, (current_semester,)).fetchall()
     
-    # Copy them to next semester
     for cls in active_classes:
         conn.execute("""
             INSERT INTO classes (course_id, instructor_id, semester, class_time, capacity, avg_rating, cancelled)
@@ -159,16 +168,13 @@ async def _run_end_of_semester(conn):
     
     print(f"📋 Copied {len(active_classes)} classes to semester {new_semester}")
     
-    # Apply suspensions for next semester
     conn.execute("""
         UPDATE users SET suspended = 1, suspended_next_semester = 0 
         WHERE suspended_next_semester = 1
     """)
     
-    # Process student GPAs and academic standing
     students = conn.execute("SELECT * FROM students WHERE terminated = 0").fetchall()
     for student in students:
-        # Get grades from completed courses this semester
         grades = conn.execute("""
             SELECT grade FROM enrollments 
             WHERE student_id = ? AND semester = ? AND grade IS NOT NULL AND grade != 'IP'
@@ -179,13 +185,11 @@ async def _run_end_of_semester(conn):
             total_points = sum(grade_points.get(g['grade'], 0) for g in grades)
             semester_gpa = total_points / len(grades)
             
-            # Update student's semester GPA
             conn.execute("""
                 UPDATE students SET semester_gpa = ?, semesters_completed = semesters_completed + 1 
                 WHERE id = ?
             """, (semester_gpa, student['id']))
-            
-            # Recalculate overall GPA
+
             all_grades = conn.execute("""
                 SELECT grade FROM enrollments 
                 WHERE student_id = ? AND grade IS NOT NULL AND grade != 'IP'
@@ -196,7 +200,6 @@ async def _run_end_of_semester(conn):
                 overall_gpa = total / len(all_grades)
                 conn.execute("UPDATE students SET gpa = ? WHERE id = ?", (overall_gpa, student['id']))
             
-            # Check for termination
             if semester_gpa < 2.0:
                 conn.execute("UPDATE students SET terminated = 1 WHERE id = ?", (student['id'],))
                 conn.execute("""
@@ -206,28 +209,22 @@ async def _run_end_of_semester(conn):
                 """, (student['id'],))
     
     """Run end of semester processing"""
-    # Get current semester
     semester = conn.execute("SELECT value FROM settings WHERE key = 'semester'").fetchone()
     current_semester = int(semester['value']) if semester else 1
     new_semester = current_semester + 1
     
-    # Archive current enrollments as completed courses
     conn.execute("""
         UPDATE enrollments 
         SET status = 'completed' 
         WHERE semester = ? AND status = 'registered'
     """, (current_semester,))
     
-    # Clear waitlists for next semester
     conn.execute("""
         UPDATE enrollments 
         SET status = 'dropped' 
         WHERE semester = ? AND status = 'waitlisted'
     """, (current_semester,))
     
-    # --- COPY ALL ACTIVE CLASSES TO NEXT SEMESTER ---
-    # This copies classes that were offered this semester (not cancelled)
-    # so they are available next semester too
     active_classes = conn.execute("""
         SELECT course_id, instructor_id, class_time, capacity, avg_rating
         FROM classes 
@@ -243,15 +240,11 @@ async def _run_end_of_semester(conn):
     
     print(f"📋 Copied {len(active_classes)} classes to semester {new_semester}")
     
-    # Apply suspensions for next semester
     conn.execute("""
         UPDATE users SET suspended = 1, suspended_next_semester = 0 
         WHERE suspended_next_semester = 1
     """)
     
-    # Process student GPAs... (rest of your existing code)
-    
-    # Increment semester number and reset period
     conn.execute("UPDATE settings SET value = 'setup' WHERE key = 'period'")
     conn.execute("UPDATE settings SET value = ? WHERE key = 'semester'", (str(new_semester),))
     

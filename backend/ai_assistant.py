@@ -1,14 +1,3 @@
-"""
-ai_assistant.py  —  College0 AI Assistant Backend
-==================================================
-A FastAPI server that acts as a secure proxy between the React frontend
-and the Anthropic API.
-
-Run
----
-    uvicorn ai_assistant:app --reload --port 8000
-"""
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -29,7 +18,6 @@ from api.instructors import router as instructors_router
 
 app = FastAPI(title="College0 AI Assistant", version="1.0")
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -40,7 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register all route routers
 app.include_router(auth_router)
 app.include_router(ai_router)
 app.include_router(classes_router)

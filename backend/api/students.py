@@ -1,4 +1,3 @@
-# api/students.py - Student endpoints
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 from database import get_conn
@@ -6,6 +5,8 @@ from services.gpa_calculator import calculate_gpa, is_honor_roll_eligible
 from services.graduation_checker import check_graduation_eligibility
 
 router = APIRouter()
+
+# ===== Student Listing Endpoints ===========================================================
 
 @router.get("/api/students/all")
 async def get_all_students():
@@ -35,6 +36,8 @@ async def get_top_gpa_students(limit: int = 3):
         
         return {"students": [dict(s) for s in students]}
 
+# ===== Student Detail Endpoint ===========================================================
+
 @router.get("/api/student/{user_id}")
 async def get_student(user_id: int):
     """Get a specific student by user ID"""
@@ -51,11 +54,12 @@ async def get_student(user_id: int):
         
         return dict(student)
 
+# ===== Student Dashboard Endpoint ===========================================================
+
 @router.get("/api/student/{user_id}/dashboard")
 async def get_student_dashboard(user_id: int):
     """Get dashboard data for a student"""
     with get_conn() as conn:
-        # Get student info
         student = conn.execute("""
             SELECT s.* 
             FROM students s 
@@ -65,11 +69,9 @@ async def get_student_dashboard(user_id: int):
         if not student:
             return {"error": "Student not found"}
         
-        # Get current semester
         semester_result = conn.execute("SELECT value FROM settings WHERE key = 'semester'").fetchone()
         current_semester = int(semester_result['value']) if semester_result else 1
         
-        # Get all grades for GPA calculation
         all_grades = conn.execute("""
             SELECT grade FROM enrollments 
             WHERE student_id = ? AND grade IS NOT NULL AND grade != 'IP'
@@ -83,7 +85,6 @@ async def get_student_dashboard(user_id: int):
                 total += grade_points.get(g['grade'], 0)
             overall_gpa = total / len(all_grades)
         
-        # Get current semester grades
         sem_grades = conn.execute("""
             SELECT grade FROM enrollments 
             WHERE student_id = ? AND semester = ? AND grade IS NOT NULL AND grade != 'IP'
@@ -96,7 +97,6 @@ async def get_student_dashboard(user_id: int):
                 total += grade_points.get(g['grade'], 0)
             semester_gpa = total / len(sem_grades)
         
-        # Count completed courses
         completed_result = conn.execute("""
             SELECT COUNT(*) as count FROM enrollments 
             WHERE student_id = ? AND grade IS NOT NULL AND grade != 'F' AND grade != 'IP'
@@ -115,7 +115,9 @@ async def get_student_dashboard(user_id: int):
             "pendingInterview": student['pending_interview'] if 'pending_interview' in student.keys() else False,
             "isNew": False
         }
-        
+
+# ===== Academic History Endpoint ===========================================================
+
 @router.get("/api/student/{user_id}/academic-history")
 async def get_academic_history(user_id: int):
     """Get academic history for a student"""
@@ -129,7 +131,6 @@ async def get_academic_history(user_id: int):
         
         grade_points = {'A': 4.0, 'B': 3.0, 'C': 2.0, 'D': 1.0, 'F': 0.0}
         
-        # FIX: 'code' is on courses (cs), not classes (c)
         history = conn.execute("""
             SELECT e.semester, e.grade, cs.code, cs.title as name
             FROM enrollments e
@@ -151,7 +152,7 @@ async def get_academic_history(user_id: int):
         
         return {"history": result}
 
-        
+# ===== Student Honor Credit Endpoint ===========================================================
 
 @router.post("/api/student/use-honor")
 async def use_honor_credit(student_id: str):

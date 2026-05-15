@@ -30,6 +30,8 @@ export default function InstructorHome({ navigate }) {
     fetchInstructorData();
   }, [currentUser, refreshTrigger]);
 
+  // ===== Derived State =================================================================
+
   // Calculate totals from the actual data
   const totalClasses = myClasses.length;
   const totalStudents = myClasses.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
@@ -49,12 +51,15 @@ export default function InstructorHome({ navigate }) {
     <div>
       <PageTitle sub={`Welcome back, ${currentUser.name || currentUser.username}`}>Instructor Dashboard</PageTitle>
 
+      {/* Suspension banner — shown when the registrar has suspended the account */}
       {currentUser.suspended && (
         <div style={{ background: 'var(--danger)18', border: '1px solid var(--danger)', borderRadius: '6px', padding: '1rem', marginBottom: '1rem' }}>
           ⛔ Your account is suspended. Contact the registrar.
         </div>
       )}
 
+      {/* ── Quick Stats Row ──────────────────────────────────────────────────── */}
+      {/* Warnings card turns amber when at least one warning is on record */}
       <Grid cols={3}>
         <Card style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 700 }}>{totalClasses}</div>
@@ -76,6 +81,7 @@ export default function InstructorHome({ navigate }) {
         </Card>
       )}
 
+      {/* ── Per-Class Cards ──────────────────────────────────────────────────── */}
       {myClasses.map(cls => {
         const students = cls.students || [];
         const enrolledCount = students.length;
@@ -84,12 +90,14 @@ export default function InstructorHome({ navigate }) {
 
         return (
           <Card key={cls.id} style={{ marginTop: '1.5rem' }}>
+            {/* Class header: code, name, time/capacity, cancelled tag, star rating */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>{cls.code}</span>
                 <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 600 }}>{cls.name}</h3>
                 <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{cls.class_time} · {enrolledCount}/{capacity} students</div>
               </div>
+              {/* Rating turns danger-colored when average drops below 2 */}
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 {cls.cancelled && <Tag color="var(--danger)">Cancelled</Tag>}
                 {avgRating !== null && avgRating > 0 && (

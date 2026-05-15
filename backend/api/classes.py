@@ -6,6 +6,8 @@ from models.request_models import CreateClassRequest, UpdateClassRequest
 
 router = APIRouter()
 
+# ===== Class listing endpoint with optional semester filter, includes course and instructor details, and enrollment counts ==============================================================
+
 @router.get("/api/classes")
 async def get_classes(semester: Optional[int] = None):
     with get_conn() as conn:
@@ -49,6 +51,8 @@ async def get_classes(semester: Optional[int] = None):
         
         return {"classes": [dict(cls) for cls in classes]}
 
+# ===== Rated classes endpoints for top-rated and lowest-rated classes ===========================================================
+
 @router.get("/api/classes/top-rated")
 async def get_top_rated_classes(limit: int = 3):
     """Get top rated classes"""
@@ -82,6 +86,8 @@ async def get_lowest_rated_classes(limit: int = 3):
         """, (limit,)).fetchall()
         
         return {"classes": [dict(cls) for cls in classes]}
+
+# ===== GPA Review endpoint for registrar to identify classes with potential grading issues ============================================================
 
 @router.get("/api/classes/gpa-review")
 async def get_classes_for_gpa_review(semester: int = 1):
@@ -121,6 +127,8 @@ async def get_classes_for_gpa_review(semester: int = 1):
         
         return {"all": all_classes, "flagged": flagged}
 
+# ===== Single class review submission endpoint (updates avg rating and checks for instructor warnings) ===========================================================
+
 @router.get("/api/class/{class_id}")
 async def get_class(class_id: int):
     """Get a specific class by ID"""
@@ -140,6 +148,8 @@ async def get_class(class_id: int):
             raise HTTPException(status_code=404, detail="Class not found")
         
         return dict(cls)
+
+# ===== Class Management Endpoints (Create/Update) ===========================================================
 
 @router.post("/api/class/create")
 async def create_class(req: CreateClassRequest):
@@ -183,6 +193,8 @@ async def update_class(class_id: int, req: UpdateClassRequest):
         """, (req.instructorId, req.time, req.maxSize, class_id))
         
         return {"success": True, "message": "Class updated successfully"}
+
+# ===== Class endpoint for listing, details, creation, and updates. ====================================================================
 
 @router.get("/api/class/{class_id}/enrollment-count")
 async def get_class_enrollment_count(class_id: int):

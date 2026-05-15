@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../auth.jsx';
 import { Card, Btn, Textarea, Alert } from './UI.jsx';
 
-// Simple markdown renderer — no external deps needed
+
+// ===== Simple markdown renderer here for headings, lists, bold/italics, and inline code. Not full markdown spec, 
+// just basic formatting for AI responses. ========
 function MarkdownText({ text }) {
   const lines = text.split('\n');
   const elements = [];
@@ -11,17 +13,17 @@ function MarkdownText({ text }) {
   while (i < lines.length) {
     const line = lines[i];
 
-    // Heading ##
+    // Heading ###
     if (line.startsWith('### ')) {
       elements.push(<div key={i} style={{ fontWeight: 700, fontSize: '13px', marginTop: '0.6rem', marginBottom: '0.2rem' }}>{renderInline(line.slice(4))}</div>);
     } else if (line.startsWith('## ')) {
       elements.push(<div key={i} style={{ fontWeight: 700, fontSize: '14px', marginTop: '0.7rem', marginBottom: '0.3rem', borderBottom: '1px solid var(--border)', paddingBottom: '2px' }}>{renderInline(line.slice(3))}</div>);
     } else if (line.startsWith('# ')) {
       elements.push(<div key={i} style={{ fontWeight: 700, fontSize: '15px', marginTop: '0.8rem', marginBottom: '0.3rem' }}>{renderInline(line.slice(2))}</div>);
-    // Horizontal rule ---
+      // Horizontal rule 
     } else if (/^---+$/.test(line.trim())) {
       elements.push(<hr key={i} style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0.5rem 0' }} />);
-    // Bullet point
+      // Bullet point  
     } else if (line.startsWith('- ') || line.startsWith('* ')) {
       elements.push(
         <div key={i} style={{ display: 'flex', gap: '0.4rem', marginTop: '2px' }}>
@@ -29,7 +31,7 @@ function MarkdownText({ text }) {
           <span>{renderInline(line.slice(2))}</span>
         </div>
       );
-    // Numbered list
+      // Numbered list
     } else if (/^\d+\.\s/.test(line)) {
       const match = line.match(/^(\d+)\.\s(.*)/);
       elements.push(
@@ -38,10 +40,10 @@ function MarkdownText({ text }) {
           <span>{renderInline(match[2])}</span>
         </div>
       );
-    // Empty line = spacing
+      // Empty line = spacing
     } else if (line.trim() === '') {
       elements.push(<div key={i} style={{ height: '0.4rem' }} />);
-    // Normal text
+      // Normal text
     } else {
       elements.push(<div key={i}>{renderInline(line)}</div>);
     }
@@ -50,6 +52,7 @@ function MarkdownText({ text }) {
   return <div style={{ lineHeight: '1.6' }}>{elements}</div>;
 }
 
+// ===== Inlite markdown renderer for bold, italics, and inline code within a line of text. Used by MarkdownText component.
 function renderInline(text) {
   // Bold **text** and *text*, inline code `code`
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
@@ -68,6 +71,7 @@ function renderInline(text) {
 const API_BASE = 'http://localhost:8000';
 
 export default function AIChat() {
+
   const { currentUser } = useAuth();
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([
@@ -76,7 +80,9 @@ export default function AIChat() {
   const [loading, setLoading] = useState(false);
   const [contextData, setContextData] = useState(null);
 
-  // Fetch context data from backend
+  // ====================== Fetch Context Data on Mount ====================
+  // Like current semester, enrolled classes, GPA, warnings, etc. to provide more informed answers and reduce hallucinations. 
+  // This is fetched once on component mount and when user changes.
   const fetchContextData = async () => {
     if (!currentUser) return;
 
@@ -93,6 +99,7 @@ export default function AIChat() {
     fetchContextData();
   }, [currentUser]);
 
+  // ===== Chat Functionality =================================================================
   const ask = async () => {
     if (!question.trim()) return;
     const q = question.trim();
@@ -101,15 +108,15 @@ export default function AIChat() {
     setLoading(true);
 
     try {
-      // Get current period and semester from backend
+      // Fetch semester period
       const periodRes = await fetch(`${API_BASE}/api/semester/period`);
       const periodData = await periodRes.json();
 
-      // Get classes from backend
+      // Fetch available classes
       const classesRes = await fetch(`${API_BASE}/api/classes?semester=${periodData.semester || 1}`);
       const classesData = await classesRes.json();
 
-      // Get student data if user is student
+      // Fetch student-specific data if applicable
       let studentData = null;
       if (currentUser?.role === 'student') {
         const studentRes = await fetch(`${API_BASE}/api/student/${currentUser.id}/dashboard`);
@@ -120,18 +127,18 @@ export default function AIChat() {
         studentData.enrollments = enrollData.enrolled || [];
       }
 
-      // Get instructor data if user is instructor
+      // Fetch instructor-specific data if applicable
       let instructorData = null;
       if (currentUser?.role === 'instructor') {
         const instructorRes = await fetch(`${API_BASE}/api/instructor/${currentUser.id}/classes`);
         instructorData = await instructorRes.json();
       }
 
-      // Get taboo words
+      // Fetch taboo words
       const tabooRes = await fetch(`${API_BASE}/api/taboo-words`);
       const tabooData = await tabooRes.json();
 
-      // Call YOUR backend instead of Anthropic directly
+      // Send request to AI backend
       const res = await fetch(`${API_BASE}/ask`, {
         method: 'POST',
         headers: {
@@ -213,9 +220,12 @@ export default function AIChat() {
 
   return (
     <Card style={{ marginTop: '2rem' }}>
+      {/* Header */}
       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', color: 'var(--accent)', marginBottom: '1rem', fontWeight: 700 }}>
         ✦ AI Assistant
       </div>
+
+      {/* Messages Container */}
       <div style={{ minHeight: '180px', maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {messages.map((m, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
@@ -227,11 +237,13 @@ export default function AIChat() {
               border: m.role !== 'user' ? '1px solid var(--border)' : 'none',
             }}>
               {m.role === 'assistant' ? <MarkdownText text={m.text} /> : m.text}
+              {/* Hallucination Warning Badge */}
               {m.hallucination_warning && (
                 <div style={{ marginTop: '0.4rem', fontSize: '10px', color: 'var(--warn)', fontFamily: 'var(--font-mono)' }}>
                   ⚠ Answer from general LLM — may not reflect CunyZero specifics. Verify with registrar.
                 </div>
               )}
+              {/* Local Source Badge */}
               {m.source === 'local' && (
                 <div style={{ marginTop: '0.4rem', fontSize: '10px', color: 'var(--success)', fontFamily: 'var(--font-mono)' }}>
                   ✓ From local knowledge base
@@ -240,10 +252,13 @@ export default function AIChat() {
             </div>
           </div>
         ))}
+        {/* Loading Indicator */}
         {loading && (
           <div style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '12px', padding: '0.5rem' }}>Thinking...</div>
         )}
       </div>
+
+      {/* Input Area */}
       <div style={{ display: 'flex', gap: '0.5rem' }}>
         <input
           value={question} onChange={e => setQuestion(e.target.value)}
@@ -257,6 +272,8 @@ export default function AIChat() {
         />
         <Btn variant="primary" onClick={ask} disabled={loading || !question.trim()}>Ask</Btn>
       </div>
+
+      {/* Footer Info */}
       <div style={{ marginTop: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>
         Answers are drawn from local CunyZero data first. Unknown queries are sent to the LLM with a hallucination warning.
       </div>

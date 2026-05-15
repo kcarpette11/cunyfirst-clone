@@ -11,10 +11,14 @@ load_dotenv()
 router = APIRouter()
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
+# ===== Knowledge entry builder that constructs relevant information about the student, their classes, 
+# and the current semester context for use in AI question answering ===========================================================
+
 def build_dynamic_entries(user_role: str, ctx: dict) -> list:
     """Build knowledge entries from context"""
     entries = []
     
+    # System context
     period = ctx.get("currentPeriod", "unknown")
     quota = ctx.get("programQuota", "unknown")
     taboo = ctx.get("tabooWords", [])
@@ -25,6 +29,7 @@ def build_dynamic_entries(user_role: str, ctx: dict) -> list:
     if taboo:
         entries.append(f"Taboo words: {', '.join(taboo)}.")
     
+    # Class information
     for cls in ctx.get("classes", []):
         rating = cls.get("avgRating")
         rating_text = f"Average rating: {rating:.1f}/5." if rating else "No ratings yet."
@@ -36,6 +41,7 @@ def build_dynamic_entries(user_role: str, ctx: dict) -> list:
             f"{rating_text}"
         )
     
+    # Student-specific context
     if user_role == "student":
         student = ctx.get("student", {})
         if student:
@@ -53,6 +59,7 @@ def build_dynamic_entries(user_role: str, ctx: dict) -> list:
                     f"Grade: {enrollment.get('grade') or 'In Progress'}."
                 )
     
+    # Instructor-specific context
     if user_role == "instructor":
         for cls in ctx.get("instructorClasses", []):
             entries.append(f"You teach {cls.get('code')}. Enrolled students: {cls.get('enrolledCount', 0)}.")
@@ -66,6 +73,9 @@ def build_dynamic_entries(user_role: str, ctx: dict) -> list:
                 )
     
     return entries
+
+# ===== AI Context retrieval endpoint that provides relevant information about the student, 
+# their classes, and the current semester context for use in AI question answering ===========================================================
 
 @router.get("/ai/context/{user_id}")
 async def get_ai_context(user_id: int):
@@ -135,6 +145,9 @@ async def get_ai_context(user_id: int):
         
         return context
 
+# AI Question answering endpoint that takes a user question, retrieves relevant context, 
+# and generates an answer using the Anthropic API ===========================================================
+
 @router.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest):
     """Process an AI question"""
@@ -148,10 +161,12 @@ async def ask(req: AskRequest):
         print(f"History length: {len(req.history)}")
         print("="*60)
         
+        # Validate question
         question = req.question.strip()
         if not question:
             raise HTTPException(status_code=400, detail="Question must not be empty.")
         
+        # Build knowledge corpus
         print("Step 1: Getting static knowledge...")
         static = get_static_knowledge()
         print(f"  ✓ Got {len(static)} static entries")
@@ -164,6 +179,7 @@ async def ask(req: AskRequest):
         full_corpus = static + dynamic_entries
         print(f"  ✓ Total: {len(full_corpus)} documents")
         
+        # TF-IDF retrieval
         print("Step 4: Building IDF...")
         full_idf = build_idf(full_corpus)
         print(f"  ✓ IDF built with {len(full_idf)} terms")
@@ -174,6 +190,7 @@ async def ask(req: AskRequest):
         
         use_local_only = len(relevant) >= 2
         
+        # Build system prompt
         print("Step 6: Building system prompt...")
         context_entries = dynamic_entries + relevant
         system_prompt = (
@@ -184,6 +201,7 @@ async def ask(req: AskRequest):
         )
         print(f"  ✓ System prompt length: {len(system_prompt)}")
         
+        # Build conversation history
         print("Step 7: Building history messages...")
         history_messages = [{"role": msg.role, "content": msg.content} for msg in req.history if msg.role in ("user", "assistant")]
         if history_messages and history_messages[0]["role"] == "assistant":
@@ -191,6 +209,7 @@ async def ask(req: AskRequest):
         history_messages.append({"role": "user", "content": question})
         print(f"  ✓ History messages: {len(history_messages)}")
         
+        # Call Anthropic API
         print("Step 8: Calling Anthropic API...")
         print(f"  Model: claude-4-6")
         print(f"  Max tokens: 512")
@@ -203,6 +222,7 @@ async def ask(req: AskRequest):
         )
         print(f"  ✓ Anthropic response received")
         
+        # Extract and return answer
         print("Step 9: Extracting answer...")
         answer = "".join(block.text for block in response.content if hasattr(block, "text")).strip()
         if not answer:

@@ -1,4 +1,3 @@
-# models/user.py
 from pydantic import BaseModel
 from typing import Optional
 
@@ -6,7 +5,7 @@ class User(BaseModel):
     id: Optional[int] = None
     username: str
     password: Optional[str] = None
-    role: str  # 'registrar', 'instructor', 'student', 'visitor'
+    role: str 
     email: Optional[str] = None
     active: bool = True
     terminated: bool = False

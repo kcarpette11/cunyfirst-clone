@@ -10,6 +10,7 @@ export default function TabooWords({ navigate }) {
   const [msg, setMsg] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+
   // Fetch taboo words from backend
   const fetchTabooWords = async () => {
     try {
@@ -32,7 +33,11 @@ export default function TabooWords({ navigate }) {
     fetchTabooWords();
   }, [refreshTrigger]);
 
+  // ===== Actions ================================================================= 
+  // Add a new word to the taboo list, with validation to prevent empty or duplicate entries
+
   const addWord = async () => {
+    // Normalize to lowercase and guard against empty input or duplicates
     const w = newWord.trim().toLowerCase();
     if (!w) return;
 
@@ -67,6 +72,7 @@ export default function TabooWords({ navigate }) {
     }
   };
 
+  // Remove word from taboo list
   const removeWord = async (word) => {
     try {
       const response = await fetch(`${API_BASE}/api/taboo-word/remove`, {
@@ -92,6 +98,7 @@ export default function TabooWords({ navigate }) {
     }
   };
 
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '3rem' }}>
@@ -103,13 +110,17 @@ export default function TabooWords({ navigate }) {
   return (
     <div style={{ maxWidth: '600px' }}>
       <PageTitle sub="Manage the list of censored words in reviews">Taboo Words</PageTitle>
+
       {msg && <Alert type="info">{msg}</Alert>}
 
+      {/* ── Add Word Card ────────────────────────────────────────────────────── */}
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>Add New Taboo Word</SectionTitle>
+        {/* Policy description: asterisk threshold and warning escalation rules */}
         <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '1rem', lineHeight: 1.5 }}>
           Words on this list are automatically censored in student reviews. Reviews with 1–2 occurrences are shown with asterisks; reviews with 3+ occurrences are hidden entirely and the author receives 2 warnings.
         </p>
+        {/* Input supports Enter key as a shortcut for the Add button */}
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <Input
             value={newWord}
@@ -122,6 +133,7 @@ export default function TabooWords({ navigate }) {
         </div>
       </Card>
 
+      {/* ── Current Words Card ───────────────────────────────────────────────── */}
       <Card>
         <SectionTitle>Current Taboo Words ({tabooWords.length})</SectionTitle>
         {tabooWords.length === 0 && (
@@ -129,6 +141,7 @@ export default function TabooWords({ navigate }) {
             No taboo words defined.
           </p>
         )}
+        {/* Tag cloud — each word chip has an inline × remove button */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {tabooWords.map(w => (
             <div
@@ -144,6 +157,7 @@ export default function TabooWords({ navigate }) {
               }}
             >
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{w}</span>
+              {/* × button scales up on hover for a subtle affordance */}
               <button
                 onClick={() => removeWord(w)}
                 style={{

@@ -1,8 +1,11 @@
 # services/graduation_checker.py
 from typing import List, Dict, Tuple
 
+
 REQUIRED_COURSES_COUNT = 8
 MIN_GRADUATION_COURSES = 8
+
+# ===== Graduation eligibility checking ============================================================
 
 def check_graduation_eligibility(
     completed_courses: List[Dict],
@@ -28,6 +31,8 @@ def check_graduation_eligibility(
     )
     
     return is_eligible, missing_required, completed_count
+
+# ===== Required courses status tracking ============================================================
 
 def get_required_courses_status(
     completed_courses: List[Dict],
@@ -58,9 +63,13 @@ def get_required_courses_status(
     
     return status
 
+# Graduation progress calculation
+
 def calculate_progress_percentage(completed_count: int) -> float:
     """Calculate graduation progress percentage"""
     return min(100, (completed_count / MIN_GRADUATION_COURSES) * 100)
+
+# Application permission checking
 
 def can_apply_for_graduation(
     completed_count: int,

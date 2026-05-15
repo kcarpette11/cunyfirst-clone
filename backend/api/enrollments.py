@@ -1,18 +1,24 @@
-# api/enrollments.py - Enrollment endpoints
 MAX_COURSES_PER_SEMESTER = 6
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from models.request_models import EnrollmentRequest, DropEnrollmentRequest, GradeRequest, AdmitWaitlistRequest
 from database import get_conn, get_setting
 from services.gpa_calculator import calculate_gpa
 from services.warning_system import issue_warning
+
+class GradeJustificationAccept(BaseModel):
+    classId: int
+    instructorId: int
+
 router = APIRouter()
+
+# ===== Enrollment Management Endpoint ===============================================================
 
 @router.post("/api/enroll")
 async def enroll_student(req: EnrollmentRequest):
     """Enroll a student in a class"""
     try:
         with get_conn() as conn:
-            # Convert to integers to ensure proper matching
             student_id = int(req.studentId)
             class_id = int(req.classId)
             semester = int(req.semester)
@@ -30,7 +36,6 @@ async def enroll_student(req: EnrollmentRequest):
             if cls['cancelled']:
                 return {"success": False, "message": "Class is cancelled"}
 
-            # First, check if student exists
             student = conn.execute(
                 "SELECT id FROM students WHERE id = ? OR user_id = ?",
                 (student_id, student_id)
@@ -68,7 +73,6 @@ async def enroll_student(req: EnrollmentRequest):
             if current_enrolled['count'] >= MAX_COURSES_PER_SEMESTER:
                 return {"success": False, "message": f"Maximum {MAX_COURSES_PER_SEMESTER} courses per semester"}
 
-            # Check time conflict
             student_classes = conn.execute("""
                 SELECT c.class_time FROM enrollments e
                 JOIN classes c ON e.class_id = c.id
@@ -79,7 +83,6 @@ async def enroll_student(req: EnrollmentRequest):
                 if sc['class_time'] == cls['class_time']:
                     return {"success": False, "message": "Time conflict with another class"}
 
-            # Check capacity
             enrolled_count = conn.execute("""
                 SELECT COUNT(*) as count FROM enrollments
                 WHERE class_id = ? AND status = 'registered'
@@ -92,7 +95,6 @@ async def enroll_student(req: EnrollmentRequest):
                 """, (actual_student_id, class_id, semester))
                 return {"success": True, "message": f"Course full. Added to waitlist for {cls['code']}.", "waitlist": True}
 
-            # Finally, enroll
             conn.execute("""
                 INSERT INTO enrollments (student_id, class_id, semester, status)
                 VALUES (?, ?, ?, 'registered')
@@ -107,14 +109,12 @@ async def enroll_student(req: EnrollmentRequest):
         traceback.print_exc()
         return {"success": False, "message": f"Server error: {str(e)}"}
 
-async def admit_waitlist(req: AdmitWaitlistRequest):
-    enrollmentId = req.enrollmentId
+# ===== Enrollment Dropping & Waitlist Promotion Endpoint ===========================================
 
 @router.post("/api/enrollment/drop")
 async def drop_enrollment(req: DropEnrollmentRequest):
     """Drop an enrollment and promote the next waitlisted student if applicable"""
     with get_conn() as conn:
-        # FIX: 'code' is on courses (cs), not classes (c) — corrected JOIN order too
         enrollment = conn.execute(
             """SELECT e.*, cs.code, e.class_id, c.capacity
                FROM enrollments e
@@ -148,12 +148,12 @@ async def drop_enrollment(req: DropEnrollmentRequest):
 
         return {"success": True, "message": f"Dropped {enrollment['code']}"}
 
+# ===== Student Enrollment Queries ===========================================================
 
 @router.get("/api/student/{user_id}/enrollments")
 async def get_student_enrollments(user_id: str):
     """Get current semester enrollments for a student"""
     with get_conn() as conn:
-        # FIX #4: scope to current semester only
         semester = get_setting('semester') or 1
 
         student = conn.execute(
@@ -172,7 +172,7 @@ async def get_student_enrollments(user_id: str):
             JOIN courses cs ON c.course_id = cs.id
             LEFT JOIN instructors i ON c.instructor_id = i.id
             WHERE e.student_id = ? AND e.semester = ?
-        """, (student['id'], semester)).fetchall()  # FIX #2: alias id -> enrollment_id in SQL
+        """, (student['id'], semester)).fetchall()
 
         enrolled = [dict(e) for e in enrollments if e['status'] == 'registered']
         waitlisted = [dict(e) for e in enrollments if e['status'] == 'waitlisted']
@@ -207,6 +207,7 @@ async def get_current_enrollments(user_id: str):
 
         return {"enrollments": [dict(e) for e in enrollments]}
 
+# ===== Grade Management Endpoint ===========================================================
 
 @router.post("/api/grade/post")
 async def post_grade(req: GradeRequest):
@@ -241,10 +242,12 @@ async def post_grade(req: GradeRequest):
 
         return {"success": True, "message": f"Grade {req.grade} posted"}
 
+# ===== Waitlist Management Endpoint ===========================================================
 
 @router.post("/api/waitlist/admit")
-async def admit_waitlist(enrollmentId: int):
+async def admit_waitlist(req: AdmitWaitlistRequest):
     """Admit a student from waitlist"""
+    enrollmentId = req.enrollmentId
     with get_conn() as conn:
         enrollment = conn.execute(
             "SELECT * FROM enrollments WHERE id = ?", (enrollmentId,)
@@ -259,7 +262,6 @@ async def admit_waitlist(enrollmentId: int):
             (class_id,)
         ).fetchone()['count']
 
-        # FIX #3: inline the capacity lookup instead of calling undefined get_class_by_id()
         cls = conn.execute(
             "SELECT capacity FROM classes WHERE id = ?", (class_id,)
         ).fetchone()
@@ -277,6 +279,7 @@ async def admit_waitlist(enrollmentId: int):
 
         return {"success": True, "message": "Student admitted from waitlist"}
 
+# ===== Instructor Grade Justification Endpoints & Roster Management ===========================================
 
 @router.get("/api/instructor/{user_id}/classes")
 async def get_instructor_classes(user_id: int):
@@ -334,6 +337,7 @@ async def get_instructor_classes(user_id: int):
 
         return {"classes": result}
 
+# ===== Grade Justification Endpoints ===========================================================
 
 @router.post("/api/grade-justification/submit")
 async def submit_grade_justification(instructorId: int, classId: int, justification: str):
@@ -346,6 +350,35 @@ async def submit_grade_justification(instructorId: int, classId: int, justificat
 
         return {"success": True, "message": "Justification submitted"}
 
+@router.get("/api/grade-justifications")
+async def get_grade_justifications():
+    """Get all grade justifications"""
+    with get_conn() as conn:
+        justifications = conn.execute("""
+            SELECT gj.*, i.name as instructor_name, cs.code, cs.title as name
+            FROM grade_justifications gj
+            JOIN instructors i ON gj.instructor_id = i.id
+            JOIN classes c ON gj.class_id = c.id
+            JOIN courses cs ON c.course_id = cs.id
+            ORDER BY gj.created_at DESC
+        """).fetchall()
+
+        return {"justifications": [dict(j) for j in justifications]}
+
+@router.post("/api/grade-justification/accept")
+async def accept_grade_justification(req: GradeJustificationAccept):
+    """Mark a grade justification as reviewed/accepted"""
+    with get_conn() as conn:
+        conn.execute("""
+            UPDATE grade_justifications
+            SET reviewed = 1, reviewed_at = CURRENT_TIMESTAMP
+            WHERE class_id = ? AND instructor_id = ?
+        """, (req.classId, req.instructorId))
+
+        return {"success": True, "message": "Justification accepted"}
+
+# ===== Debug and testing endpoint to see enrollment logic in action ===========================================
+
 @router.post("/api/enroll-debug")
 async def enroll_student_debug(req: EnrollmentRequest):
     """Debug version to see what's happening"""
@@ -357,7 +390,6 @@ async def enroll_student_debug(req: EnrollmentRequest):
     print("=" * 50)
     
     with get_conn() as conn:
-        # Check if student exists
         student = conn.execute(
             "SELECT * FROM students WHERE user_id = ? OR id = ?", 
             (req.studentId, req.studentId)
@@ -366,7 +398,6 @@ async def enroll_student_debug(req: EnrollmentRequest):
         if student:
             print(f"Student ID in DB: {student['id']}, user_id: {student['user_id']}")
         
-        # Check if class exists
         cls = conn.execute(
             "SELECT * FROM classes WHERE id = ?", (req.classId,)
         ).fetchone()
@@ -374,7 +405,6 @@ async def enroll_student_debug(req: EnrollmentRequest):
         if cls:
             print(f"Class capacity: {cls['capacity']}")
             
-            # Check current enrollment count
             enrolled_count = conn.execute(
                 "SELECT COUNT(*) as count FROM enrollments WHERE class_id = ? AND status = 'registered'",
                 (req.classId,)
@@ -382,7 +412,6 @@ async def enroll_student_debug(req: EnrollmentRequest):
             print(f"Current enrolled count: {enrolled_count['count']}")
             print(f"Available spots: {cls['capacity'] - enrolled_count['count']}")
         
-        # Check existing enrollment
         existing = conn.execute("""
             SELECT * FROM enrollments
             WHERE student_id = ? AND class_id = ? AND semester = ?
@@ -412,30 +441,3 @@ async def get_all_enrollments():
         """).fetchall()
 
         return {"enrollments": [dict(e) for e in enrollments]}
-
-@router.get("/api/grade-justifications")
-async def get_grade_justifications():
-    """Get all grade justifications"""
-    with get_conn() as conn:
-        justifications = conn.execute("""
-            SELECT gj.*, i.name as instructor_name, cs.code, cs.title as name
-            FROM grade_justifications gj
-            JOIN instructors i ON gj.instructor_id = i.id
-            JOIN classes c ON gj.class_id = c.id
-            JOIN courses cs ON c.course_id = cs.id
-            ORDER BY gj.created_at DESC
-        """).fetchall()
-
-        return {"justifications": [dict(j) for j in justifications]}
-
-@router.post("/api/grade-justification/accept")
-async def accept_grade_justification(classId: int, instructorId: int):
-    """Mark a grade justification as reviewed/accepted"""
-    with get_conn() as conn:
-        conn.execute("""
-            UPDATE grade_justifications
-            SET reviewed = 1, reviewed_at = CURRENT_TIMESTAMP
-            WHERE class_id = ? AND instructor_id = ?
-        """, (classId, instructorId))
-
-        return {"success": True, "message": "Justification accepted"}

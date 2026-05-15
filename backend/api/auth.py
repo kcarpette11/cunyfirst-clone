@@ -1,9 +1,10 @@
-# api/auth.py - Authentication endpoints
 from fastapi import APIRouter, HTTPException
 from database import get_conn
 from models.request_models import LoginRequest, ChangePasswordRequest
 
 router = APIRouter()
+
+# ===== Authentication endpoints for login and logout, as well as user management endpoints for retrieving user details and changing passwords ============================================================
 
 @router.post("/api/login")
 async def login(req: LoginRequest):
@@ -39,6 +40,8 @@ async def login(req: LoginRequest):
 async def logout():
     """Logout user"""
     return {"success": True}
+
+# ===== User detail endpoints that retrieves user information along with related student or instructor details based on role ============================================================
 
 @router.get("/api/user/{user_id}")
 async def get_user(user_id: int):

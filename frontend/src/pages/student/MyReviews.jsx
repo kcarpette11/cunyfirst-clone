@@ -35,7 +35,7 @@ export default function MyReviews({ navigate }) {
       const data = await response.json();
       console.log('Enrolled classes data:', data);
 
-      // Map the data to ensure we have the right fields
+      // Normalize each enrollment to a consistent shape for the class selector
       const classes = (data.enrolled || []).map(cls => ({
         id: cls.class_id,
         class_id: cls.class_id,
@@ -56,7 +56,7 @@ export default function MyReviews({ navigate }) {
     }
   };
 
-  // Fetch existing review for selected class
+  // Fetch existing review for selected class; resets form fields if none found
   const fetchExistingReview = async (classId) => {
     if (!classId) {
       console.log('No class ID provided to fetchExistingReview');
@@ -74,6 +74,7 @@ export default function MyReviews({ navigate }) {
       const response = await fetch(`${API_BASE}/api/student/${studentId}/review/${classId}`);
 
       if (!response.ok) {
+        // 404 means no review yet — reset the form to a blank state
         if (response.status === 404) {
           console.log('No existing review found');
           setExistingReview(null);
@@ -87,6 +88,7 @@ export default function MyReviews({ navigate }) {
       const data = await response.json();
       console.log('Review data received:', data);
 
+      // Populate form fields with the existing review, or blank out if missing
       if (data.review) {
         setExistingReview(data.review);
         setRating(data.review.stars || 0);
@@ -104,7 +106,9 @@ export default function MyReviews({ navigate }) {
     }
   };
 
-  // Handle class selection
+  // ===== Actions ================================================================
+
+  // Handle class selection — sets active class and loads any existing review
   const handleClassSelect = (classObj) => {
     console.log('Selected class:', classObj);
     setSelectedClass(classObj);
@@ -114,8 +118,8 @@ export default function MyReviews({ navigate }) {
     }
   };
 
-  // Submit review
   const submitReview = async () => {
+    // Guard: require a class, a star rating, and non-empty review text
     if (!selectedClass) {
       setMsg({ text: 'Please select a class first', type: 'danger' });
       setTimeout(() => setMsg({ text: '', type: 'info' }), 3000);
@@ -186,6 +190,8 @@ export default function MyReviews({ navigate }) {
     }
   };
 
+  // ===== Effects ================================================================
+
   useEffect(() => {
     if (currentUser) {
       fetchEnrolledClasses();
@@ -193,6 +199,7 @@ export default function MyReviews({ navigate }) {
       setLoading(false);
     }
   }, [currentUser]);
+
 
   if (loading) {
     return (
@@ -202,6 +209,8 @@ export default function MyReviews({ navigate }) {
     );
   }
 
+  // ===== Main Content =============================================================
+
   return (
     <div>
       <PageTitle sub="Share your feedback about the courses you've taken">
@@ -210,8 +219,10 @@ export default function MyReviews({ navigate }) {
 
       {msg.text && <Alert type={msg.type}>{msg.text}</Alert>}
 
+      {/* Two-column layout: class selector on the left, review form on the right */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-        {/* Left column - Class selection */}
+
+        {/* ── Left Column: Class Selector ───────────────────────────────────── */}
         <Card>
           <SectionTitle>Select a Class</SectionTitle>
           {enrolledClasses.length === 0 && (
@@ -222,6 +233,7 @@ export default function MyReviews({ navigate }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {enrolledClasses.map(cls => {
               const classId = cls.class_id || cls.id;
+              // Highlight the currently selected class
               const isSelected = selectedClass && (selectedClass.class_id === classId || selectedClass.id === classId);
 
               return (
@@ -246,18 +258,20 @@ export default function MyReviews({ navigate }) {
           </div>
         </Card>
 
-        {/* Right column - Review form */}
+        {/* ── Right Column: Review Form ──────────────────────────────────────── */}
         <Card>
           <SectionTitle>
             {existingReview ? 'Edit Your Review' : 'Write a Review'}
           </SectionTitle>
 
+          {/* Prompt user to pick a class if none is selected yet */}
           {!selectedClass ? (
             <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '2rem' }}>
               Select a class from the left to write a review
             </p>
           ) : (
             <>
+              {/* Selected class summary */}
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
                   {selectedClass.code} - {selectedClass.name}
@@ -267,6 +281,7 @@ export default function MyReviews({ navigate }) {
                 </div>
               </div>
 
+              {/* Star rating input */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
                   Rating
@@ -278,6 +293,7 @@ export default function MyReviews({ navigate }) {
                 />
               </div>
 
+              {/* Review text input */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
                   Your Review
@@ -301,6 +317,7 @@ export default function MyReviews({ navigate }) {
                 />
               </div>
 
+              {/* Submit button — label changes between new and edit mode */}
               <Btn
                 onClick={submitReview}
                 disabled={submitting || rating === 0 || !reviewText.trim()}
@@ -309,6 +326,7 @@ export default function MyReviews({ navigate }) {
                 {submitting ? 'Submitting...' : (existingReview ? 'Update Review' : 'Submit Review')}
               </Btn>
 
+              {/* Reminder that submitting will overwrite the previous review */}
               {existingReview && (
                 <p style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '1rem', textAlign: 'center' }}>
                   You've already reviewed this class. Submitting will update your existing review.

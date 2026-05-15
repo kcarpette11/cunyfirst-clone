@@ -5,6 +5,8 @@ from database import get_conn
 
 router = APIRouter()
 
+# ===== Notification retrieval endpoint ==============================================================
+
 @router.get("/api/notifications/{user_id}")
 async def get_notifications(user_id: int):
     """Get all notifications for a user"""
@@ -17,6 +19,8 @@ async def get_notifications(user_id: int):
         """, (user_id,)).fetchall()
         
         return {"notifications": [dict(n) for n in notifications]}
+
+# ===== Notification read endpoints ==============================================================
 
 @router.post("/api/notifications/read")
 async def mark_notification_read(req: MarkNotificationReadRequest):
@@ -37,6 +41,8 @@ async def mark_all_notifications_read(user_id: int):
         """, (user_id,))
         
         return {"success": True}
+
+# ===== Notification creation endpoint (internal use) - not exposed to frontend ================================================================
 
 @router.post("/api/notifications/create")
 async def create_notification(user_id: int, message: str, type: str = "info"):

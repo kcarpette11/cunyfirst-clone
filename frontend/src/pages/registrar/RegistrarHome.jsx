@@ -20,32 +20,25 @@ export default function RegistrarHome({ navigate }) {
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Fetch all data from backend
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Get semester info
       const periodRes = await fetch(`${API_BASE}/api/semester/period`);
       const periodData = await periodRes.json();
 
-      // Get students
       const studentsRes = await fetch(`${API_BASE}/api/students/all`);
       const studentsData = await studentsRes.json();
 
-      // Get instructors
       const instructorsRes = await fetch(`${API_BASE}/api/instructors/all`);
       const instructorsData = await instructorsRes.json();
 
-      // Get pending applications
       const appsRes = await fetch(`${API_BASE}/api/applications/pending`);
       const appsData = await appsRes.json();
 
-      // Get pending complaints
       const complaintsRes = await fetch(`${API_BASE}/api/complaints/pending`);
       const complaintsData = await complaintsRes.json();
 
-      // Get pending graduation applications
       const gradRes = await fetch(`${API_BASE}/api/graduation/pending`);
       const gradData = await gradRes.json();
 
@@ -73,10 +66,14 @@ export default function RegistrarHome({ navigate }) {
     fetchData();
   }, [refreshTrigger]);
 
+  // ===== Derived State =================================================================
+
   const { students, instructors, pendingApps, pendingComplaints, pendingGrad, currentPeriod, semesterNumber, programQuota, periodColors, periodLabels } = dashboardData;
 
   const activeStudents = students.filter(s => !s.terminated);
   const activeInstructors = instructors.filter(i => !i.fired && !i.terminated);
+
+  // ===== Status Tag Functions =========================================================
 
   // Function to get student status tag
   const getStudentStatusTag = (student) => {
@@ -115,7 +112,8 @@ export default function RegistrarHome({ navigate }) {
     <div>
       <PageTitle sub="Registrar Control Panel">Dashboard</PageTitle>
 
-      {/* Quick Stats */}
+      {/* ── Quick Stats Row ──────────────────────────────────────────────────── */}
+      {/* Clickable cards for applications and complaints navigate to their pages */}
       <Grid cols={4} style={{ marginBottom: '1.5rem' }}>
         {[
           { label: 'Students', value: activeStudents.length, color: 'var(--success)' },
@@ -131,8 +129,8 @@ export default function RegistrarHome({ navigate }) {
         ))}
       </Grid>
 
+      {/* ── Semester Status + Graduation Queue ──────────────────────────────── */}
       <Grid cols={2}>
-        {/* Current Period */}
         <Card>
           <SectionTitle>Semester Status</SectionTitle>
           <div style={{ marginBottom: '0.75rem' }}>
@@ -148,7 +146,6 @@ export default function RegistrarHome({ navigate }) {
           </button>
         </Card>
 
-        {/* Graduation Applications */}
         <Card>
           <SectionTitle>Graduation Queue</SectionTitle>
           {pendingGrad.length === 0 ? <p style={{ color: 'var(--muted)', fontSize: '13px' }}>No pending graduation applications.</p> : (
@@ -168,7 +165,7 @@ export default function RegistrarHome({ navigate }) {
         </Card>
       </Grid>
 
-      {/* All Students */}
+      {/* ── All Students Table ───────────────────────────────────────────────── */}
       <Card style={{ marginTop: '1.5rem' }}>
         <SectionTitle>All Students</SectionTitle>
         <Table
@@ -184,7 +181,7 @@ export default function RegistrarHome({ navigate }) {
         />
       </Card>
 
-      {/* All Instructors */}
+      {/* ── All Instructors Table ────────────────────────────────────────────── */}
       <Card style={{ marginTop: '1.5rem' }}>
         <SectionTitle>All Instructors</SectionTitle>
         <Table

@@ -5,6 +5,8 @@ from database import get_conn
 
 router = APIRouter()
 
+# ===== Utility function to filter taboo words from text ============================================================
+
 def filter_taboo(text: str) -> tuple[str, int]:
     with get_conn() as conn:
         rows = conn.execute("SELECT word FROM taboo_words").fetchall()
@@ -20,6 +22,8 @@ def filter_taboo(text: str) -> tuple[str, int]:
             text = pattern.sub(censored, text)
 
     return text, count
+
+# ===== Taboo word management endpoints ============================================================
 
 @router.get("/api/taboo-words")
 async def get_taboo_words():

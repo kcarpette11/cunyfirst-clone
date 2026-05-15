@@ -3,6 +3,7 @@ import { PageTitle, Card, Input, Select, Btn, Table, Tag, Alert, SectionTitle, G
 
 const API_BASE = 'http://localhost:8000';
 
+// Registrar-only page to create and manage classes for the current semester
 export default function ClassSetup({ navigate }) {
   const [loading, setLoading] = useState(true);
   const [instructors, setInstructors] = useState([]);
@@ -21,26 +22,23 @@ export default function ClassSetup({ navigate }) {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Fetch data from backend
+  // Like current semester, instructors, and existing classes to populate form options and list of classes   
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Get semester info
       const periodRes = await fetch(`${API_BASE}/api/semester/period`);
       const periodData = await periodRes.json();
       setSemesterNumber(periodData.semester || 1);
 
-      // Get instructors
       const instructorsRes = await fetch(`${API_BASE}/api/instructors`);
       const instructorsData = await instructorsRes.json();
       setInstructors(instructorsData.instructors || []);
 
-      // Set default instructor if available
       if (instructorsData.instructors?.length > 0 && !form.instructorId) {
         setForm(f => ({ ...f, instructorId: instructorsData.instructors[0].id }));
       }
 
-      // Get classes for current semester
       const classesRes = await fetch(`${API_BASE}/api/classes?semester=${periodData.semester || 1}`);
       const classesData = await classesRes.json();
       setCurrentClasses(classesData.classes || []);
@@ -159,6 +157,7 @@ export default function ClassSetup({ navigate }) {
     );
   }
 
+  {/* Main content with form to create/edit classes and list of current classes */ }
   return (
     <div>
       <PageTitle sub="Create and manage classes for the current semester">Class Setup</PageTitle>

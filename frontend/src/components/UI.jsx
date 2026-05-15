@@ -1,4 +1,6 @@
 // Shared UI component primitives used across pages
+// These are just simple styled components to keep the UI consistent and make it easy to build new pages without worrying about design details. 
+// They use inline styles for simplicity, but could be switched to CSS modules or a library like styled-components if desired.
 
 export function Card({ children, style = {} }) {
   return (
@@ -15,6 +17,7 @@ export function Card({ children, style = {} }) {
   );
 }
 
+// Page and section titles with consistent styling, plus optional subtitle for page title
 export function PageTitle({ children, sub }) {
   return (
     <div style={{ marginBottom: '2rem' }}>
@@ -33,6 +36,7 @@ export function PageTitle({ children, sub }) {
   );
 }
 
+// Section titles for breaking up pages into parts
 export function SectionTitle({ children }) {
   return <h2 style={{
     fontFamily: 'var(--font-display)',
@@ -43,6 +47,7 @@ export function SectionTitle({ children }) {
   }}>{children}</h2>;
 }
 
+// Button component with variants for primary, danger, success, and ghost styles. Disabled state and custom styles supported.
 export function Btn({ children, onClick, variant = 'default', disabled = false, style = {} }) {
   const variants = {
     default: {
@@ -79,6 +84,8 @@ export function Btn({ children, onClick, variant = 'default', disabled = false, 
 
   const variantStyle = variants[variant];
 
+  // For disabled state, we can either use the default variant style with reduced opacity or define specific disabled styles. 
+  // We just reduce opacity and change cursor here.
   return (
     <button
       onClick={onClick}
@@ -111,6 +118,7 @@ export function Btn({ children, onClick, variant = 'default', disabled = false, 
   );
 }
 
+// Form components: Input, Select, Textarea with consistent styling and focus states. Label support and custom styles allowed.
 export function Input({ label, value, onChange, type = 'text', placeholder = '', required = false, style = {} }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', ...style }}>
@@ -151,6 +159,7 @@ export function Input({ label, value, onChange, type = 'text', placeholder = '',
   );
 }
 
+// For Select options, we allow either simple strings or objects with value and label properties for more complex cases. The component handles both.
 export function Select({ label, value, onChange, options, style = {} }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', ...style }}>
@@ -184,6 +193,7 @@ export function Select({ label, value, onChange, options, style = {} }) {
   );
 }
 
+// Textarea component with auto-resize, label support, and consistent styling. Custom styles allowed. Focus states included for better UX.
 export function Textarea({ label, value, onChange, rows = 4, placeholder = '', style = {} }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', ...style }}>
@@ -223,6 +233,8 @@ export function Textarea({ label, value, onChange, rows = 4, placeholder = '', s
   );
 }
 
+// Alert component for displaying messages with different severity levels (info, warning, danger, success). 
+// Colors and icons can be customized based on type. Consistent styling for all alerts.
 export function Alert({ children, type = 'info' }) {
   const colors = {
     info: 'var(--accent)',
@@ -253,6 +265,10 @@ export function Alert({ children, type = 'info' }) {
     </div>
   );
 }
+
+// Table component for displaying tabular data with headers and rows. 
+// Supports empty state message when no data is available. 
+// Responsive design with horizontal scrolling on smaller screens.
 
 export function Table({ headers, rows, emptyMsg = 'No data.' }) {
   return (
@@ -313,6 +329,8 @@ export function Table({ headers, rows, emptyMsg = 'No data.' }) {
   );
 }
 
+// Star rating component for displaying and selecting ratings. Supports custom max rating and onChange handler for interactivity.
+
 export function Stars({ value, max = 5, onChange }) {
   return (
     <div style={{ display: 'flex', gap: '4px' }}>
@@ -332,6 +350,8 @@ export function Stars({ value, max = 5, onChange }) {
   );
 }
 
+// Tag component for displaying small labels or categories. Color can be customized via props, defaulting to a neutral border color. 
+// Consistent styling for all tags.
 export function Tag({ children, color = 'var(--border)' }) {
   return (
     <span style={{
@@ -348,6 +368,7 @@ export function Tag({ children, color = 'var(--border)' }) {
   );
 }
 
+// Grid component for creating responsive layouts. The number of columns can be customized via props, defaulting to 2.
 export function Grid({ children, cols = 2 }) {
   return (
     <div style={{

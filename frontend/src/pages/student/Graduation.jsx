@@ -21,7 +21,6 @@ export default function Graduation({ navigate }) {
   const [msg, setMsg] = useState({ text: '', type: 'info' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Fetch graduation data from backend
   const fetchGraduationData = async () => {
     if (!currentUser) return;
 
@@ -53,6 +52,8 @@ export default function Graduation({ navigate }) {
   useEffect(() => {
     fetchGraduationData();
   }, [currentUser, refreshTrigger]);
+
+  // ===== Actions =================================================================
 
   const applyForGraduation = async () => {
     try {
@@ -95,6 +96,7 @@ export default function Graduation({ navigate }) {
     <div style={{ maxWidth: '700px' }}>
       <PageTitle sub="Apply for graduation when you complete your program">Graduation</PageTitle>
 
+      {/* Congratulatory banner — shown only after graduation is confirmed */}
       {isGraduated && (
         <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--surface)', border: '2px solid var(--accent)', borderRadius: '12px', marginBottom: '2rem' }}>
           <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎓</div>
@@ -105,10 +107,11 @@ export default function Graduation({ navigate }) {
 
       {msg.text && <Alert type={msg.type}>{msg.text}</Alert>}
 
-      {/* Progress */}
+      {/* ── Progress Card ────────────────────────────────────────────────────── */}
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>Graduation Progress</SectionTitle>
 
+        {/* Course completion progress bar */}
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>Courses Completed</span>
@@ -125,6 +128,7 @@ export default function Graduation({ navigate }) {
           </div>
         </div>
 
+        {/* Summary tags: course count, required courses, warnings */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
           <Tag color={completedCount >= 8 ? 'var(--success)' : 'var(--warn)'}>{completedCount}/8 Courses ✓</Tag>
           <Tag color={missingRequired.length === 0 ? 'var(--success)' : 'var(--danger)'}>
@@ -133,6 +137,7 @@ export default function Graduation({ navigate }) {
           {currentUser?.warnings > 0 && <Tag color="var(--warn)">{currentUser.warnings} Warning(s)</Tag>}
         </div>
 
+        {/* List of required courses the student has not yet completed */}
         {missingRequired.length > 0 && (
           <div style={{ background: 'var(--danger)18', border: '1px solid var(--danger)', borderRadius: '4px', padding: '0.75rem', marginBottom: '1rem' }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--danger)', marginBottom: '0.4rem' }}>MISSING REQUIRED COURSES:</div>
@@ -144,6 +149,7 @@ export default function Graduation({ navigate }) {
           </div>
         )}
 
+        {/* Application status alert — pending / approved / rejected */}
         {existingApp && (
           <Alert type={existingApp.status === 'pending' ? 'warn' : existingApp.status === 'approved' ? 'success' : 'danger'}>
             {existingApp.status === 'pending' && '⏳ Your graduation application is pending registrar review.'}
@@ -152,6 +158,7 @@ export default function Graduation({ navigate }) {
           </Alert>
         )}
 
+        {/* Apply button — disabled until all requirements are met */}
         {!existingApp && !isGraduated && (
           <Btn
             variant={canApply ? 'primary' : 'default'}
@@ -163,7 +170,7 @@ export default function Graduation({ navigate }) {
         )}
       </Card>
 
-      {/* Completed Courses */}
+      {/* ── Completed Courses Table ──────────────────────────────────────────── */}
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>Completed Courses ({completedCount})</SectionTitle>
         <Table
@@ -178,6 +185,7 @@ export default function Graduation({ navigate }) {
         />
       </Card>
 
+      {/* ── Failed Courses Table (shown only when applicable) ───────────────── */}
       {failedCourses.length > 0 && (
         <Card>
           <SectionTitle>Failed Courses (eligible for retake)</SectionTitle>

@@ -105,7 +105,7 @@ export default function StudentComplaints({ navigate }) {
       </div>
     );
   }
-
+  // Main content with complaint form and list of filed complaints
   return (
     <div>
       <PageTitle sub="File complaints with the registrar">Complaints</PageTitle>

@@ -1,9 +1,10 @@
-# backend/database.py
 import sqlite3
 from pathlib import Path
 from contextlib import contextmanager
 
 DB_PATH = Path(__file__).parent / "college0.db"
+
+# ===== Database connection context manager ==============================
 
 @contextmanager
 def get_conn():
@@ -16,10 +17,12 @@ def get_conn():
     finally:
         conn.close()
 
+# ===== Database initialization & schema creation =========================
+
 def init_db():
     """Create all tables if they don't exist"""
     with get_conn() as conn:
-        # Users table
+        # Users table 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +39,7 @@ def init_db():
             )
         """)
         
-        # Students table
+        # Students table 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS students (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,7 +64,7 @@ def init_db():
             )
         """)
         
-        # Instructors table
+        # Instructors table 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS instructors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -140,7 +143,7 @@ def init_db():
             )
         """)
         
-        # Settings table
+        # Settings table 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
@@ -148,7 +151,7 @@ def init_db():
             )
         """)
         
-        # Knowledge base table
+        #Knowledge base table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS knowledge (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,7 +161,7 @@ def init_db():
             )
         """)
         
-        # Applications table
+        # Applications table 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS applications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -177,7 +180,7 @@ def init_db():
             )
         """)
         
-        # Complaints table
+        # Complaints table (first version)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS complaints (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -223,7 +226,7 @@ def init_db():
             )
         """)
         
-        # Notifications table
+        # Notifications table 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -236,7 +239,7 @@ def init_db():
             )
         """)
 
-        # Complaints table
+        # Complaints table (duplicate/updated version) 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS complaints (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -257,14 +260,13 @@ def init_db():
         
         print("✅ All tables created successfully")
 
+# ===== User functions ===================================================
 
-# ─── User Functions ────────────────────────────────────────────
 def get_user_by_id(user_id):
     with get_conn() as conn:
         return conn.execute(
             "SELECT * FROM users WHERE id = ?", (user_id,)
         ).fetchone()
-
 
 def get_user_by_username(username):
     with get_conn() as conn:
@@ -272,13 +274,11 @@ def get_user_by_username(username):
             "SELECT * FROM users WHERE username = ?", (username,)
         ).fetchone()
 
-
 def get_user_by_email(email):
     with get_conn() as conn:
         return conn.execute(
             "SELECT * FROM users WHERE email = ?", (email,)
         ).fetchone()
-
 
 def verify_password(username, password):
     user = get_user_by_username(username)
@@ -286,14 +286,12 @@ def verify_password(username, password):
         return user
     return None
 
-
 def update_user_password(user_id, new_password):
     with get_conn() as conn:
         conn.execute(
             "UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?",
             (new_password, user_id)
         )
-
 
 def update_user(user_id, **kwargs):
     """Generic user update function"""
@@ -304,14 +302,13 @@ def update_user(user_id, **kwargs):
                 (value, user_id)
             )
 
+# ===== Student functions ================================================
 
-# ─── Student Functions ─────────────────────────────────────────
 def get_student_by_user_id(user_id):
     with get_conn() as conn:
         return conn.execute(
             "SELECT * FROM students WHERE user_id = ?", (user_id,)
         ).fetchone()
-
 
 def get_student_by_code(student_code):
     with get_conn() as conn:
@@ -319,13 +316,11 @@ def get_student_by_code(student_code):
             "SELECT * FROM students WHERE student_code = ?", (student_code,)
         ).fetchone()
 
-
 def get_all_students():
     with get_conn() as conn:
         return conn.execute(
             "SELECT s.*, u.username, u.email FROM students s JOIN users u ON s.user_id = u.id"
         ).fetchall()
-
 
 def update_student_gpa(student_id, gpa, semester_gpa):
     with get_conn() as conn:
@@ -333,7 +328,6 @@ def update_student_gpa(student_id, gpa, semester_gpa):
             "UPDATE students SET gpa = ?, semester_gpa = ? WHERE id = ?",
             (gpa, semester_gpa, student_id)
         )
-
 
 def get_current_enrollments(student_id, semester=None):
     """Get current semester enrollments for a student"""
@@ -363,7 +357,6 @@ def get_academic_history(student_id):
             ORDER BY e.semester DESC
         """, (student_id,)).fetchall()
 
-
 def use_honor_to_remove_warning(student_user_id):
     """Use an honor credit to remove a warning"""
     with get_conn() as conn:
@@ -382,21 +375,19 @@ def use_honor_to_remove_warning(student_user_id):
         
         return {"ok": True, "msg": "Warning removed using honor credit"}
 
+# ===== Instructor functions =============================================
 
-# ─── Instructor Functions ──────────────────────────────────────
 def get_instructor_by_user_id(user_id):
     with get_conn() as conn:
         return conn.execute(
             "SELECT * FROM instructors WHERE user_id = ?", (user_id,)
         ).fetchone()
 
-
 def get_all_instructors():
     with get_conn() as conn:
         return conn.execute(
             "SELECT i.*, u.username, u.email FROM instructors i JOIN users u ON i.user_id = u.id"
         ).fetchall()
-
 
 def get_instructor_classes(instructor_id, semester=None):
     """Get classes taught by an instructor"""
@@ -414,7 +405,6 @@ def get_instructor_classes(instructor_id, semester=None):
             WHERE c.instructor_id = ? AND c.semester = ?
         """, (instructor_id, semester)).fetchall()
 
-
 def get_class_roster(class_id):
     """Get all students enrolled in a class"""
     with get_conn() as conn:
@@ -425,7 +415,6 @@ def get_class_roster(class_id):
             JOIN students s ON e.student_id = s.id
             WHERE e.class_id = ? AND e.status IN ('registered', 'waitlisted')
         """, (class_id,)).fetchall()
-
 
 def issue_warning_to_instructor(instructor_user_id):
     """Issue a warning to an instructor"""
@@ -447,19 +436,17 @@ def issue_warning_to_instructor(instructor_user_id):
         
         return {"success": True, "warnings": new_warnings, "suspended": suspended}
 
+# ===== Course / class functions ========================================
 
-# ─── Course/Class Functions ────────────────────────────────────
 def get_all_courses():
     with get_conn() as conn:
         return conn.execute("SELECT * FROM courses").fetchall()
-
 
 def get_course_by_code(code):
     with get_conn() as conn:
         return conn.execute(
             "SELECT * FROM courses WHERE code = ?", (code,)
         ).fetchone()
-
 
 def get_all_classes(semester=None):
     with get_conn() as conn:
@@ -495,7 +482,6 @@ def get_class_by_id(class_id):
             WHERE c.id = ?
         """, (class_id,)).fetchone()
 
-
 def get_class_avg_rating(class_id):
     """Get the average rating for a class"""
     with get_conn() as conn:
@@ -504,7 +490,6 @@ def get_class_avg_rating(class_id):
             (class_id,)
         ).fetchone()
         return result['avg'] if result and result['avg'] else None
-
 
 def get_class_gpa(class_id):
     """Calculate GPA for a class"""
@@ -522,7 +507,6 @@ def get_class_gpa(class_id):
         total = sum(grade_points.get(e['grade'], 0) for e in enrollments)
         return total / len(enrollments)
 
-
 def create_class(course_id, instructor_id, semester, class_time, capacity):
     """Create a new class"""
     with get_conn() as conn:
@@ -531,7 +515,6 @@ def create_class(course_id, instructor_id, semester, class_time, capacity):
             VALUES (?, ?, ?, ?, ?, 0, 0)
         """, (course_id, instructor_id, semester, class_time, capacity))
         return cursor.lastrowid
-
 
 def update_class(class_id, **kwargs):
     """Update a class"""
@@ -542,8 +525,8 @@ def update_class(class_id, **kwargs):
                 (value, class_id)
             )
 
+# ===== Enrollment functions =============================================
 
-# ─── Enrollment Functions ──────────────────────────────────────
 def get_enrollments_for_student(student_id, semester=None):
     with get_conn() as conn:
         if semester:
@@ -565,7 +548,6 @@ def get_enrollments_for_student(student_id, semester=None):
                 WHERE e.student_id = ?
             """, (student_id,)).fetchall()
 
-
 def get_enrollments_for_class(class_id):
     with get_conn() as conn:
         return conn.execute("""
@@ -574,7 +556,6 @@ def get_enrollments_for_class(class_id):
             JOIN students s ON e.student_id = s.id
             WHERE e.class_id = ? AND e.status = 'registered'
         """, (class_id,)).fetchall()
-
 
 def enroll_student(student_id, class_id, semester):
     with get_conn() as conn:
@@ -618,7 +599,6 @@ def enroll_student(student_id, class_id, semester):
         )
         return True, "Enrolled successfully", False
 
-
 def drop_enrollment(enrollment_id):
     with get_conn() as conn:
         conn.execute(
@@ -626,14 +606,12 @@ def drop_enrollment(enrollment_id):
             (enrollment_id,)
         )
 
-
 def admit_from_waitlist(enrollment_id):
     with get_conn() as conn:
         conn.execute(
             "UPDATE enrollments SET status = 'registered' WHERE id = ?",
             (enrollment_id,)
         )
-
 
 def post_grade(enrollment_id, grade):
     """Post a grade for an enrollment"""
@@ -643,8 +621,8 @@ def post_grade(enrollment_id, grade):
             (grade, enrollment_id)
         )
 
+# ===== Review functions =================================================
 
-# ─── Review Functions ──────────────────────────────────────────
 def get_reviews_for_class(class_id, show_all=False):
     with get_conn() as conn:
         if show_all:
@@ -663,17 +641,15 @@ def get_reviews_for_class(class_id, show_all=False):
                 ORDER BY r.created_at DESC
             """, (class_id,)).fetchall()
 
-
 def get_student_review(student_id, class_id):
     with get_conn() as conn:
         return conn.execute("""
             SELECT * FROM reviews WHERE student_id = ? AND class_id = ?
         """, (student_id, class_id)).fetchone()
 
-
 def submit_review(student_id, class_id, stars, text, semester):
     with get_conn() as conn:
-        # Check for taboo words
+
         taboo_words = conn.execute("SELECT word FROM taboo_words").fetchall()
         text_lower = text.lower()
         taboo_count = sum(1 for tw in taboo_words if tw['word'].lower() in text_lower)
@@ -681,7 +657,6 @@ def submit_review(student_id, class_id, stars, text, semester):
         shown = taboo_count < 3
         author_warned = taboo_count > 0
         
-        # Process text with censorship
         processed_text = text
         for tw in taboo_words:
             if tw['word'].lower() in text_lower:
@@ -693,13 +668,11 @@ def submit_review(student_id, class_id, stars, text, semester):
             (student_id, class_id, stars, processed_text, 1 if shown else 0, 1 if author_warned else 0, semester)
         )
         
-        # Issue warnings if needed
         if taboo_count >= 3:
             conn.execute("UPDATE students SET warnings = warnings + 2 WHERE id = ?", (student_id,))
         elif taboo_count >= 1:
             conn.execute("UPDATE students SET warnings = warnings + 1 WHERE id = ?", (student_id,))
-        
-        # Update class average rating
+
         avg_rating = conn.execute(
             "SELECT AVG(stars) as avg FROM reviews WHERE class_id = ? AND shown = 1",
             (class_id,)
@@ -711,7 +684,6 @@ def submit_review(student_id, class_id, stars, text, semester):
                 (avg_rating, class_id)
             )
             
-            # Check if instructor should be warned
             if avg_rating < 2:
                 class_info = conn.execute(
                     "SELECT instructor_id FROM classes WHERE id = ?", (class_id,)
@@ -724,8 +696,8 @@ def submit_review(student_id, class_id, stars, text, semester):
         
         return shown, author_warned, taboo_count
 
+# ===== Application functions ===========================================
 
-# ─── Application Functions ─────────────────────────────────────
 def submit_application(applicant_type, name, email, incoming_gpa, program, statement):
     with get_conn() as conn:
         cursor = conn.execute("""
@@ -734,20 +706,17 @@ def submit_application(applicant_type, name, email, incoming_gpa, program, state
         """, (applicant_type, name, email, incoming_gpa, program, statement))
         return cursor.lastrowid
 
-
 def get_pending_applications():
     with get_conn() as conn:
         return conn.execute(
             "SELECT * FROM applications WHERE status = 'pending' ORDER BY created_at ASC"
         ).fetchall()
 
-
 def get_all_applications():
     with get_conn() as conn:
         return conn.execute(
             "SELECT * FROM applications ORDER BY created_at DESC"
         ).fetchall()
-
 
 def process_application(app_id, decision, justification=None):
     with get_conn() as conn:
@@ -757,15 +726,14 @@ def process_application(app_id, decision, justification=None):
             WHERE id = ?
         """, (decision, justification, app_id))
 
+# ===== Complaint functions =============================================
 
-# ─── Complaint Functions ───────────────────────────────────────
 def submit_complaint(from_id, from_role, against_id, against_role, text):
     with get_conn() as conn:
         conn.execute("""
             INSERT INTO complaints (from_id, from_role, against_id, against_role, text, status, created_at)
             VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
         """, (from_id, from_role, against_id, against_role, text))
-
 
 def get_pending_complaints():
     with get_conn() as conn:
@@ -778,7 +746,6 @@ def get_pending_complaints():
             ORDER BY c.created_at DESC
         """).fetchall()
 
-
 def resolve_complaint(complaint_id, resolution):
     with get_conn() as conn:
         conn.execute("""
@@ -787,8 +754,8 @@ def resolve_complaint(complaint_id, resolution):
             WHERE id = ?
         """, (resolution, complaint_id))
 
+# ===== Notification functions ==========================================
 
-# ─── Notification Functions ────────────────────────────────────
 def add_notification(user_id, message, type="info"):
     """Add a notification for a user, skipping GPA notifications for instructors and registrars"""
     with get_conn() as conn:
@@ -805,7 +772,6 @@ def add_notification(user_id, message, type="info"):
             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
         """, (user_id, message, type))
 
-
 def get_user_notifications(user_id):
     with get_conn() as conn:
         return conn.execute("""
@@ -814,14 +780,12 @@ def get_user_notifications(user_id):
             ORDER BY created_at DESC
         """, (user_id,)).fetchall()
 
-
 def mark_notification_read(notification_id):
     with get_conn() as conn:
         conn.execute(
             "UPDATE notifications SET read = 1 WHERE id = ?",
             (notification_id,)
         )
-
 
 def mark_all_notifications_read(user_id):
     with get_conn() as conn:
@@ -830,8 +794,8 @@ def mark_all_notifications_read(user_id):
             (user_id,)
         )
 
+# ===== Settings functions ==============================================
 
-# ─── Settings Functions ────────────────────────────────────────
 def get_setting(key):
     with get_conn() as conn:
         result = conn.execute(
@@ -847,8 +811,8 @@ def set_setting(key, value):
             (key, value)
         )
 
+# ===== Knowledge base functions ========================================
 
-# ─── Knowledge Base Functions ──────────────────────────────────
 def get_knowledge_for_role(role):
     with get_conn() as conn:
         return conn.execute(
@@ -856,13 +820,12 @@ def get_knowledge_for_role(role):
             (role,)
         ).fetchall()
 
-
 def get_all_knowledge():
     with get_conn() as conn:
         return conn.execute("SELECT * FROM knowledge").fetchall()
 
+# ===== Graduation functions ============================================
 
-# ─── Graduation Functions ──────────────────────────────────────
 def apply_for_graduation(student_id):
     with get_conn() as conn:
         # Check if already applied
@@ -881,7 +844,6 @@ def apply_for_graduation(student_id):
         
         return {"ok": True, "msg": "Graduation application submitted"}
 
-
 def get_pending_graduation_apps():
     with get_conn() as conn:
         return conn.execute("""
@@ -891,7 +853,6 @@ def get_pending_graduation_apps():
             WHERE g.status = 'pending'
             ORDER BY g.created_at ASC
         """).fetchall()
-
 
 def process_graduation(app_id, approve, note=None):
     with get_conn() as conn:
@@ -914,8 +875,8 @@ def process_graduation(app_id, approve, note=None):
                     UPDATE students SET graduated = 1, terminated = 1 WHERE id = ?
                 """, (app['student_id'],))
 
+# ===== Warning functions ===============================================
 
-# ─── Warning Functions ─────────────────────────────────────────
 def issue_warning(user_id):
     with get_conn() as conn:
         user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
@@ -934,21 +895,18 @@ def issue_warning(user_id):
         elif user['role'] == 'student' and new_warnings >= 3:
             conn.execute("UPDATE users SET suspended = 1 WHERE id = ?", (user_id,))
 
+# ===== Taboo words functions =========================================
 
-# ─── Taboo Words Functions ─────────────────────────────────────
 def get_taboo_words():
     with get_conn() as conn:
         return [w['word'] for w in conn.execute("SELECT word FROM taboo_words").fetchall()]
-
 
 def add_taboo_word(word):
     with get_conn() as conn:
         conn.execute("INSERT OR IGNORE INTO taboo_words (word) VALUES (?)", (word.lower(),))
 
-
 def remove_taboo_word(word):
     with get_conn() as conn:
         conn.execute("DELETE FROM taboo_words WHERE word = ?", (word.lower(),))
-
 
 print("✅ database.py loaded successfully")

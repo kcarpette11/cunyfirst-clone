@@ -3,8 +3,17 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 from database import get_conn
 from services.warning_system import issue_warning
+from pydantic import BaseModel
+
+class FireInstructorRequest(BaseModel):
+    instructorId: int
+
+class InstructorActionRequest(BaseModel):
+    instructorId: int
 
 router = APIRouter()
+
+# ===== Instructor listing endpoints with optional active filter, includes user details and warning status ============================================================
 
 @router.get("/api/instructors")
 async def get_instructors():
@@ -33,6 +42,8 @@ async def get_all_instructors():
         
         return {"instructors": [dict(i) for i in instructors]}
 
+# ===== Single instructor endpoint by user ID, includes user details and warning status ============================================================
+
 @router.get("/api/instructor/{user_id}")
 async def get_instructor(user_id: int):
     """Get a specific instructor by user ID"""
@@ -48,6 +59,8 @@ async def get_instructor(user_id: int):
             raise HTTPException(status_code=404, detail="Instructor not found")
         
         return dict(instructor)
+
+# ===== Instructor classes and rosters endpoints, includes enrollment status and student details ============================================================
 
 @router.get("/api/instructor/{user_id}/classes")
 async def get_instructor_classes(user_id: int):
@@ -100,7 +113,6 @@ async def get_instructor_classes(user_id: int):
 async def get_class_roster(user_id: int, class_id: int):
     """Get roster for a specific class (instructor only)"""
     with get_conn() as conn:
-        # Verify instructor owns this class
         instructor = conn.execute(
             "SELECT id FROM instructors WHERE user_id = ?", (user_id,)
         ).fetchone()
@@ -126,13 +138,16 @@ async def get_class_roster(user_id: int, class_id: int):
         
         return {"students": [dict(s) for s in students]}
 
+# ===== Instructor actions - warn and fire, which update the instructor's warning count and employment status, 
+# and also update the associated user account and add notifications ============================================================
+
 @router.post("/api/instructor/warn")
-async def warn_instructor(instructorId: int):
+async def warn_instructor(req: InstructorActionRequest):
     """Issue a warning to an instructor"""
     with get_conn() as conn:
         instructor = conn.execute(
             "SELECT i.*, u.id as user_id FROM instructors i JOIN users u ON i.user_id = u.id WHERE i.id = ?",
-            (instructorId,)
+            (req.instructorId,)
         ).fetchone()
         
         if not instructor:
@@ -142,24 +157,24 @@ async def warn_instructor(instructorId: int):
         
         conn.execute(
             "UPDATE instructors SET warnings = ?, suspended = ? WHERE id = ?",
-            (warnings, 1 if suspended else 0, instructorId)
+            (warnings, 1 if suspended else 0, req.instructorId)
         )
         
         return {"success": True, "message": message}
 
 @router.post("/api/instructor/fire")
-async def fire_instructor(instructorId: int):
+async def fire_instructor(req: FireInstructorRequest):
     """Fire an instructor"""
     with get_conn() as conn:
         instructor = conn.execute(
             "SELECT i.*, u.id as user_id FROM instructors i JOIN users u ON i.user_id = u.id WHERE i.id = ?",
-            (instructorId,)
+            (req.instructorId,)
         ).fetchone()
         
         if not instructor:
             return {"success": False, "message": "Instructor not found"}
         
-        conn.execute("UPDATE instructors SET fired = 1 WHERE id = ?", (instructorId,))
+        conn.execute("UPDATE instructors SET fired = 1 WHERE id = ?", (req.instructorId,))
         conn.execute("UPDATE users SET active = 0, terminated = 1 WHERE id = ?", (instructor['user_id'],))
         
         # Add notification

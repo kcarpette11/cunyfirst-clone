@@ -98,6 +98,7 @@ export default function Login({ navigate }) {
     </div>
   );
 
+  // If user is already logged in, redirect to home
   return (
     <div style={{ maxWidth: '440px', margin: '4rem auto' }}>
       <PageTitle sub="Access your CunyZero account">Sign In</PageTitle>

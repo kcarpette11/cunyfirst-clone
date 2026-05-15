@@ -186,6 +186,7 @@ export default function Navbar({ navigate, currentPage }) {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Fetch notifications from backend
+  // Like new complaints for instructors, new applications for registrar, or new reviews for students, depending on user role
   const fetchNotifications = async () => {
     if (!currentUser) return;
 

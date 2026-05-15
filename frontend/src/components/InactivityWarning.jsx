@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../auth.jsx';
 
 export default function InactivityWarning() {
+
     const { logout } = useAuth();
     const [showWarning, setShowWarning] = useState(false);
     const [timeLeft, setTimeLeft] = useState(0);
 
     useEffect(() => {
+        // Timer configuration
         let warningTimeout;
         let countdownInterval;
 
-        // Time settings (match with your auth.jsx)
+        // Time settings matching with the auth.jsx autoLogoutTime and warning time
         const AUTO_LOGOUT_TIME = 30 * 60 * 1000; // 30 minutes
         const WARNING_TIME = 29 * 60 * 1000; // Show warning at 29 minutes
         const WARNING_DURATION = 60; // 60 seconds warning countdown
@@ -74,6 +76,7 @@ export default function InactivityWarning() {
         };
     }, [logout, showWarning, timeLeft]);
 
+    // ===== Helper Functions =============================================================
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -113,6 +116,7 @@ export default function InactivityWarning() {
         }
       `}</style>
 
+            {/* Warning Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
                 <span style={{ fontSize: '24px' }}>⚠️</span>
                 <div style={{ fontWeight: 600, color: 'var(--warn)', fontSize: '16px' }}>
@@ -120,6 +124,7 @@ export default function InactivityWarning() {
                 </div>
             </div>
 
+            {/* Countdown Message */}
             <div style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '1rem', lineHeight: '1.5' }}>
                 You'll be automatically logged out in{' '}
                 <strong style={{
@@ -132,6 +137,7 @@ export default function InactivityWarning() {
                 due to inactivity.
             </div>
 
+            {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
                     onClick={() => {

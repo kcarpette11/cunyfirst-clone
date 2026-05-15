@@ -11,7 +11,6 @@ export default function Applications({ navigate }) {
   const [msg, setMsg] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Fetch applications from backend
   const fetchApplications = async () => {
     try {
       setLoading(true);
@@ -33,6 +32,9 @@ export default function Applications({ navigate }) {
   useEffect(() => {
     fetchApplications();
   }, [refreshTrigger]);
+
+  // ===== Actions =================================================================
+  // Handles accepting or rejecting an application, with an optional justification for rejections
 
   const handle = async (appId, decision) => {
     const j = justification[appId] || '';
@@ -84,6 +86,7 @@ export default function Applications({ navigate }) {
       <PageTitle sub="Review and process applicant submissions">Applications</PageTitle>
       {msg && <Alert type={msg.startsWith('Error') ? 'danger' : 'success'}>{msg}</Alert>}
 
+      {/* ── Pending Applications Card ────────────────────────────────────────── */}
       <Card>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: 'var(--text)', marginBottom: '1rem' }}>
           Pending ({pendingApps.length})
@@ -91,6 +94,7 @@ export default function Applications({ navigate }) {
         {pendingApps.length === 0 && <p style={{ color: 'var(--muted)' }}>No pending applications.</p>}
         {pendingApps.map(app => (
           <div key={app.id} style={{ border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem', marginBottom: '1rem' }}>
+            {/* Applicant summary: name, email, role tag, optional GPA and program tags */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: '1rem' }}>{app.name}</div>
@@ -113,9 +117,13 @@ export default function Applications({ navigate }) {
                 {new Date(app.created_at).toLocaleDateString()}
               </div>
             </div>
+
+            {/* Personal statement */}
             <div style={{ background: 'var(--surface2)', borderRadius: '4px', padding: '0.75rem', marginBottom: '0.75rem', fontSize: '13px', color: 'var(--muted)', fontStyle: 'italic' }}>
               "{app.statement}"
             </div>
+
+            {/* Justification textarea + accept / reject buttons */}
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: '200px' }}>
                 <Textarea
@@ -134,6 +142,8 @@ export default function Applications({ navigate }) {
         ))}
       </Card>
 
+      {/* ── Processed Applications Table ─────────────────────────────────────── */}
+      {/* Accepted rows include the auto-generated login credentials for the new user */}
       <Card style={{ marginTop: '1.5rem' }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: 'var(--text)', marginBottom: '1rem' }}>
           Processed ({processedApps.length})

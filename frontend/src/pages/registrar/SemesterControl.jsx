@@ -13,6 +13,7 @@ const PERIOD_INFO = {
 
 const PERIODS = ['setup', 'registration', 'running', 'grading', 'closed'];
 
+// Registrar-only page to control semester periods and view current status
 export default function SemesterControl({ navigate }) {
   const [loading, setLoading] = useState(true);
   const [semesterData, setSemesterData] = useState({
@@ -22,7 +23,6 @@ export default function SemesterControl({ navigate }) {
   const [msg, setMsg] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Fetch current semester data from backend
   const fetchSemesterData = async () => {
     try {
       setLoading(true);
@@ -47,6 +47,8 @@ export default function SemesterControl({ navigate }) {
   useEffect(() => {
     fetchSemesterData();
   }, [refreshTrigger]);
+
+  // ===== Actions =================================================================
 
   const advancePeriod = async () => {
     try {
@@ -73,6 +75,7 @@ export default function SemesterControl({ navigate }) {
     }
   };
 
+  // Directly jump to any period — bypasses the normal advance sequence
   const setPeriod = async (period) => {
     try {
       const response = await fetch(`${API_BASE}/api/semester/set-period`, {
@@ -98,6 +101,7 @@ export default function SemesterControl({ navigate }) {
     }
   };
 
+  // Resets to semester N+1 at the setup period — only available when closed
   const startNewSemester = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/semester/new`, {
@@ -122,6 +126,8 @@ export default function SemesterControl({ navigate }) {
     }
   };
 
+  // ===== Derived State =================================================================
+
   const { currentPeriod, semesterNumber } = semesterData;
   const cur = PERIOD_INFO[currentPeriod];
 
@@ -138,6 +144,7 @@ export default function SemesterControl({ navigate }) {
       <PageTitle sub="Control the academic calendar">Semester Management</PageTitle>
       {msg && <Alert type="success">{msg}</Alert>}
 
+      {/* ── Current Status Card ──────────────────────────────────────────────── */}
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>Current Status</SectionTitle>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -145,6 +152,7 @@ export default function SemesterControl({ navigate }) {
           <Tag color={cur?.color}>{cur?.label}</Tag>
         </div>
         <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '1.5rem', lineHeight: 1.6 }}>{cur?.desc}</p>
+        {/* Advance is disabled on closed; Start New Semester appears instead */}
         <Btn variant="primary" onClick={advancePeriod} disabled={currentPeriod === 'closed'}>
           Advance to Next Period →
         </Btn>
@@ -155,12 +163,14 @@ export default function SemesterControl({ navigate }) {
         )}
       </Card>
 
+      {/* ── Period Overview Card ─────────────────────────────────────────────── */}
       <Card>
         <SectionTitle>Period Overview</SectionTitle>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {PERIODS.map((p, i) => {
             const info = PERIOD_INFO[p];
             const isCurrent = p === currentPeriod;
+            // Periods before the current one in the sequence are considered past
             const isPast = PERIODS.indexOf(currentPeriod) > i;
             return (
               <div key={p} style={{
@@ -169,6 +179,7 @@ export default function SemesterControl({ navigate }) {
                 background: isCurrent ? info.color + '18' : 'transparent',
                 border: `1px solid ${isCurrent ? info.color : 'var(--border)'}`,
               }}>
+                {/* Step indicator: checkmark for past, number for upcoming, colored for current */}
                 <div style={{
                   width: '24px', height: '24px', borderRadius: '50%',
                   background: isPast ? 'var(--success)' : isCurrent ? info.color : 'var(--border)',
@@ -181,6 +192,7 @@ export default function SemesterControl({ navigate }) {
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: isCurrent ? info.color : 'var(--text)' }}>{info.label}</div>
                   <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{info.desc}</div>
                 </div>
+                {/* Non-current rows get a Jump button; current row gets a CURRENT badge */}
                 {!isCurrent && (
                   <Btn onClick={() => setPeriod(p)} style={{ fontSize: '11px', padding: '0.25rem 0.5rem' }}>Jump</Btn>
                 )}

@@ -6,11 +6,13 @@ from services.warning_system import issue_warning
 
 router = APIRouter()
 
+# Review submission endpoint with taboo word filtering and warning system
+
 @router.post("/api/review/submit")
 async def submit_review(req: ReviewRequest):
     """Submit a review for a class"""
     with get_conn() as conn:
-        # FIRST: Get the actual student ID from the user_id
+        # Get student ID
         student = conn.execute(
             "SELECT id FROM students WHERE user_id = ?", (req.studentId,)
         ).fetchone()
@@ -18,7 +20,7 @@ async def submit_review(req: ReviewRequest):
         if not student:
             return {"success": False, "message": "Student not found"}
         
-        # Check if student is enrolled using the student's internal ID
+        # Verify enrollment and grade posted
         enrollment = conn.execute("""
             SELECT e.*, c.instructor_id 
             FROM enrollments e
@@ -29,11 +31,10 @@ async def submit_review(req: ReviewRequest):
         if not enrollment:
             return {"success": False, "message": "You are not enrolled in this class"}
         
-        # Check if grade already posted
         if not enrollment['grade'] or enrollment['grade'] == 'IP':
             return {"success": False, "message": "Reviews can only be submitted after grades are posted"}
         
-        # Check if already reviewed
+        # Check for existing review
         existing = conn.execute(
             "SELECT * FROM reviews WHERE student_id = ? AND class_id = ?",
             (student['id'], req.classId)
@@ -42,7 +43,7 @@ async def submit_review(req: ReviewRequest):
         if existing:
             return {"success": False, "message": "You have already reviewed this class"}
         
-        # Check taboo words
+        # Taboo word processing
         taboo_words = conn.execute("SELECT word FROM taboo_words").fetchall()
         taboo_list = [w['word'].lower() for w in taboo_words]
         
@@ -52,19 +53,19 @@ async def submit_review(req: ReviewRequest):
         shown = taboo_count < 3
         author_warned = taboo_count > 0
         
-        # Process text with censorship
+        # Censor taboo words
         processed_text = req.text
         for tw in taboo_list:
             if tw in text_lower:
                 processed_text = processed_text.replace(tw, '*' * len(tw))
         
-        # Insert review (use student['id'], not req.studentId)
+        # Insert review
         conn.execute("""
             INSERT INTO reviews (student_id, class_id, stars, text, shown, author_warned, semester, created_at)
             VALUES (?, ?, ?, ?, ?, ?, (SELECT value FROM settings WHERE key = 'semester'), datetime('now'))
         """, (student['id'], req.classId, req.stars, processed_text, 1 if shown else 0, 1 if author_warned else 0))
         
-        # Issue warnings if needed (use req.studentId for user_id)
+        # Issue warnings based on taboo count
         if taboo_count >= 3:
             conn.execute("UPDATE students SET warnings = warnings + 2 WHERE user_id = ?", (req.studentId,))
             message = "Review hidden due to 3+ taboo words. 2 warnings issued."
@@ -85,7 +86,7 @@ async def submit_review(req: ReviewRequest):
                 (avg_rating['avg'], req.classId)
             )
             
-            # Check if instructor should be warned
+            # Warn instructor if rating is too low
             if avg_rating['avg'] < 2:
                 class_info = conn.execute(
                     "SELECT instructor_id FROM classes WHERE id = ?", (req.classId,)
@@ -104,6 +105,8 @@ async def submit_review(req: ReviewRequest):
                         )
         
         return {"success": True, "message": message, "shown": shown}
+
+# ===== Review retrieval endpoints ===========================================================
 
 @router.get("/api/class/{class_id}/reviews")
 async def get_class_reviews(class_id: int, show_all: bool = False):

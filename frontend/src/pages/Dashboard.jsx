@@ -21,23 +21,18 @@ export default function Dashboard({ navigate }) {
     try {
       setLoading(true);
 
-      // Get current period and semester
       const periodRes = await fetch(`${API_BASE}/api/semester/period`);
       const periodData = await periodRes.json();
 
-      // Get top rated classes
       const topRatedRes = await fetch(`${API_BASE}/api/classes/top-rated?limit=3`);
       const topRatedData = await topRatedRes.json();
 
-      // Get lowest rated classes
       const lowRatedRes = await fetch(`${API_BASE}/api/classes/lowest-rated?limit=3`);
       const lowRatedData = await lowRatedRes.json();
 
-      // Get top GPA students
       const topStudentsRes = await fetch(`${API_BASE}/api/students/top-gpa?limit=3`);
       const topStudentsData = await topStudentsRes.json();
 
-      // Get all classes for current semester
       const classesRes = await fetch(`${API_BASE}/api/classes?semester=${periodData.semester || 1}`);
       const classesData = await classesRes.json();
 

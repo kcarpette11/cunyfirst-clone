@@ -3,6 +3,8 @@ from typing import Dict, Optional, Tuple
 
 MAX_WARNINGS = 3
 
+# ===== Warning issuance and management ===========================================================
+
 def issue_warning(current_warnings: int, user_role: str) -> Tuple[int, bool, str]:
     """
     Issue a warning to a user
@@ -23,6 +25,8 @@ def issue_warning(current_warnings: int, user_role: str) -> Tuple[int, bool, str
     
     return new_count, is_suspended, message
 
+# ===== Warning removal ===========================================================
+
 def remove_warning(current_warnings: int, honor_credits: int = 0) -> Tuple[int, int, bool, str]:
     """
     Remove a warning, possibly using honor credits
@@ -40,6 +44,8 @@ def remove_warning(current_warnings: int, honor_credits: int = 0) -> Tuple[int, 
     else:
         return new_warnings, honor_credits, True, "Warning removed"
     
+# ===== Suspension management ===========================================================
+
 def check_suspension_status(
     warnings: int,
     user_role: str,
@@ -54,17 +60,17 @@ def check_suspension_status(
         (is_suspended, suspended_until_semester, message)
     """
     if is_suspended and suspended_until_semester and suspended_until_semester <= current_semester:
-        # Suspension is over
         return False, None, "Suspension has ended"
     
     if warnings >= MAX_WARNINGS and not is_suspended:
-        # New suspension
         if user_role == 'instructor':
             return True, None, "Instructor suspended due to warnings"
         else:
             return True, current_semester + 1, "Student suspended for next semester"
     
     return is_suspended, suspended_until_semester, ""
+
+# ===== Registration permissions ============================================================
 
 def can_register(student: Dict, current_period: str) -> Tuple[bool, str]:
     """Check if a student can register for courses"""
@@ -78,6 +84,8 @@ def can_register(student: Dict, current_period: str) -> Tuple[bool, str]:
         return False, f"Registration not open. Current period: {current_period}"
     
     return True, "Can register"
+
+# ===== Review permissions ============================================================
 
 def can_submit_review(
     has_grade: bool,
@@ -95,6 +103,8 @@ def can_submit_review(
         return False, f"Reviews can only be submitted during running or grading period"
     
     return True, "Can submit review"
+
+# ===== Taboo word violation processing ============================================================
 
 def process_taboo_violation(taboo_count: int) -> Tuple[bool, int, str]:
     """

@@ -1,7 +1,8 @@
-# services/knowledge.py
 import math
 import re
 from typing import List, Dict
+
+# ===== Text processing utilities for TF-IDF ============================================================
 
 def tokenize(text: str) -> List[str]:
     """Tokenize text for TF-IDF calculations"""
@@ -13,6 +14,8 @@ def tokenize(text: str) -> List[str]:
     }
     tokens = re.sub(r"[^a-z0-9\s]", " ", text.lower()).split()
     return [t for t in tokens if t not in stopwords and len(t) > 2]
+
+# ===== TF-IDF implementation ============================================================
 
 def build_idf(corpus: List[str]) -> Dict[str, float]:
     """Build IDF dictionary for the corpus"""
@@ -50,6 +53,8 @@ def tfidf_scores(query: str, corpus: List[str], idf: Dict[str, float]) -> List[f
     
     return scores
 
+# ===== Relevance retrieval ============================================================
+
 def retrieve_relevant(
     question: str,
     corpus: List[str],
@@ -66,7 +71,9 @@ def retrieve_relevant(
         if score >= threshold
     ]
 
-# ── Local Knowledge Building ──────────────────────────────────────
+# ===== Static knowledge base ============================================================
+
+# ===== Local Knowledge Building ============================================================
 STATIC_KNOWLEDGE: List[str] = [
     "College0 is an AI-enabled graduate college management system.",
     "There are 4 user types: Registrar, Instructor, Student, and Visitor.",
@@ -93,6 +100,8 @@ STATIC_KNOWLEDGE: List[str] = [
     "Taboo words are configured by the registrar and are used to moderate reviews.",
     "New students must change their password on first login.",
 ]
+
+# ===== Public interface to access static knowledge ============================================================
 
 def get_static_knowledge() -> List[str]:
     """Return static knowledge base"""

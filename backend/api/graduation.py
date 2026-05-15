@@ -6,6 +6,8 @@ from services.graduation_checker import check_graduation_eligibility
 
 router = APIRouter()
 
+# ===== Graduation Application Submission ============================================================
+
 @router.post("/api/graduation/apply")
 async def apply_for_graduation(req: GraduationApplyRequest):
     """Apply for graduation"""
@@ -56,6 +58,8 @@ async def apply_for_graduation(req: GraduationApplyRequest):
         """, (student['id'],))
         
         return {"success": True, "message": "Graduation application submitted"}
+
+# ===== Graduation Applcation retrieval for admin dashboard =============================================================
 
 @router.get("/api/graduation/applications")
 async def get_graduation_applications():
@@ -108,6 +112,8 @@ async def get_pending_graduation_applications():
         
         return {"applications": [dict(app) for app in applications]}
 
+# ===== Graduation Application processing (approve/reject) ============================================================
+
 @router.post("/api/graduation/process")
 async def process_graduation(req: GraduationProcessRequest):
     """Process a graduation application (approve/reject)"""
@@ -143,11 +149,12 @@ async def process_graduation(req: GraduationProcessRequest):
         
         return {"success": True, "message": f"Application {status}"}
 
+# ==== Student Graduation Status ===========================================================
+
 @router.get("/api/student/{user_id}/graduation-status")
 async def get_graduation_status(user_id: str):
     """Get graduation status for a student"""
     with get_conn() as conn:
-        # FIX: users table has no 'name' column — query students directly
         student = conn.execute(
             "SELECT s.* FROM students s WHERE s.user_id = ?",
             (user_id,)
@@ -157,7 +164,6 @@ async def get_graduation_status(user_id: str):
             return {"error": "Student not found"}
         
         # Get completed courses
-        # FIX: 'code' is on courses (cs), not classes (c)
         completed = conn.execute("""
             SELECT e.*, c.course_id, cs.code, cs.title as name, cs.required
             FROM enrollments e
@@ -167,7 +173,6 @@ async def get_graduation_status(user_id: str):
         """, (student['id'],)).fetchall()
         
         # Get failed courses
-        # FIX: 'code' is on courses (cs), not classes (c)
         failed = conn.execute("""
             SELECT e.*, cs.code, cs.title as name
             FROM enrollments e

@@ -47,6 +47,8 @@ export default function RegistrarComplaints({ navigate }) {
     fetchData();
   }, [refreshTrigger]);
 
+  // ===== Actions =================================================================
+
   const resolve = async (complaintId, action) => {
     try {
       const response = await fetch(`${API_BASE}/api/complaint/resolve`, {
@@ -97,6 +99,9 @@ export default function RegistrarComplaints({ navigate }) {
     }
   };
 
+  // ===== Helpers =================================================================
+
+  // Normalizes raw graduation application data into a consistent shape for the UI
   const getGraduationStatus = (g) => {
     return {
       completedCount: g.completed_count || 0,
@@ -116,7 +121,8 @@ export default function RegistrarComplaints({ navigate }) {
 
       {msg && <Alert type="success">{msg}</Alert>}
 
-      {/* Graduation Applications */}
+      {/* ── Graduation Applications ──────────────────────────────────────────── */}
+      {/* Graduate button is disabled until 8 courses are done and no required courses are missing */}
       {pendingGrad.length > 0 && (
         <Card style={{ marginBottom: '1.5rem' }}>
           <SectionTitle>🎓 Graduation Applications</SectionTitle>
@@ -124,11 +130,13 @@ export default function RegistrarComplaints({ navigate }) {
             const { completedCount, missingRequired } = getGraduationStatus(g);
             return (
               <div key={g.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
+                {/* Student summary */}
                 <div style={{ marginBottom: '0.75rem', padding: '0.75rem', borderRadius: '6px', background: 'var(--surface2)' }}>
                   <div style={{ fontWeight: 700, fontSize: '15px' }}>{g.student_name || g.name || `Student #${g.student_id}`}</div>
                   <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{g.email || ''}</div>
                   <div style={{ marginTop: '0.5rem', fontSize: '13px' }}>{completedCount} classes completed</div>
                 </div>
+                {/* Missing required courses — green check if all satisfied */}
                 <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '0.75rem' }}>
                   Missing required:{' '}
                   {missingRequired.length === 0 ? (
@@ -158,7 +166,7 @@ export default function RegistrarComplaints({ navigate }) {
         </Card>
       )}
 
-      {/* Complaint Rules Banner */}
+      {/* ── Complaint Rules Banner ───────────────────────────────────────────── */}
       <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.75rem 1rem', marginBottom: '1.5rem', fontSize: '12px', color: 'var(--muted)', lineHeight: 1.6 }}>
         <strong style={{ color: 'var(--fg)' }}>Complaint Rules:</strong>{' '}
         Students may complain about other students or their instructors. Instructors may complain about students in their classes. The registrar must take action on every complaint.
@@ -166,9 +174,8 @@ export default function RegistrarComplaints({ navigate }) {
         <strong style={{ color: 'var(--fg)' }}>Actions:</strong> <em>Warn [person]</em> — issues 1 warning. Students reaching 3 warnings are suspended for 1 semester and must pay a fine before re-enrolling. Instructors reaching 3 warnings are also suspended. <em>De-register</em> — drops all current enrollments. <em>Warn Filer</em> — penalises the complainant for an unfounded complaint. <em>Dismiss</em> — closes with no action.
       </div>
 
-      {/* Pending Complaints */}
+      {/* ── Pending Complaints ───────────────────────────────────────────────── */}
       <Card style={{ marginBottom: '1.5rem' }}>
-
         <SectionTitle>Pending Complaints ({pending.length})</SectionTitle>
 
         {pending.length === 0 && (
@@ -176,6 +183,7 @@ export default function RegistrarComplaints({ navigate }) {
         )}
 
         {pending.map(c => {
+          // Normalize display names and capitalize role labels
           const filerName = c.from_name || `User #${c.from_id}`;
           const filerRole = c.from_role_display || c.from_role || 'unknown';
           const againstName = c.against_name || `User #${c.against_id}`;
@@ -185,6 +193,7 @@ export default function RegistrarComplaints({ navigate }) {
 
           return (
             <div key={c.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
+              {/* Filer → Against layout */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
                 <div style={{ padding: '0.75rem', borderRadius: '6px', background: 'var(--surface2)' }}>
                   <div style={{ fontWeight: 700 }}>{filerName}</div>
@@ -203,10 +212,12 @@ export default function RegistrarComplaints({ navigate }) {
                 </div>
               </div>
 
+              {/* Complaint text */}
               <div style={{ background: 'var(--surface2)', borderRadius: '6px', padding: '0.75rem', marginBottom: '1rem', fontStyle: 'italic' }}>
                 "{c.text}"
               </div>
 
+              {/* Action buttons — Warn Filer hidden for registrar-filed complaints; De-register only for students */}
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <Btn variant="danger" onClick={() => resolve(c.id, 'warn_against')}>
                   Warn {againstName}
@@ -230,7 +241,7 @@ export default function RegistrarComplaints({ navigate }) {
         })}
       </Card>
 
-      {/* Resolved Complaints */}
+      {/* ── Resolved Complaints Table ────────────────────────────────────────── */}
       <Card>
         <SectionTitle>Resolved Complaints</SectionTitle>
         <Table

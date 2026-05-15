@@ -10,9 +10,13 @@ GRADE_POINTS = {
     'IP': None  # In Progress - not counted
 }
 
+# ===== Grade points lookup ============================================================
+
 def get_grade_points(grade: str) -> Optional[float]:
     """Get grade points for a letter grade"""
     return GRADE_POINTS.get(grade.upper())
+
+# ===== GPA Calculation ============================================================
 
 def calculate_gpa(grades: List[str]) -> Optional[float]:
     """Calculate GPA from a list of grades"""
@@ -32,6 +36,8 @@ def calculate_class_gpa(enrollments: List[Dict]) -> Optional[float]:
     """Calculate average GPA for a class"""
     grades = [e.get('grade') for e in enrollments if e.get('grade') and e.get('grade') != 'IP']
     return calculate_gpa(grades)
+
+# ===== Academic standing evaluation ============================================================
 
 def is_honor_roll_eligible(gpa: float, semester_number: int = 1, is_overall: bool = False) -> bool:
     """Check if a student is eligible for honor roll"""

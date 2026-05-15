@@ -1,14 +1,3 @@
-"""
-main.py — CUNYFirst Clone Backend
-==================================
-FastAPI entry point. Registers all routers, initializes the DB,
-and loads environment variables.
-
-Run
----
-    uvicorn main:app --reload --port 8000
-"""
-
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -30,12 +19,12 @@ from api.admin import router as admin_router
 from api.students import router as students_router
 from api.instructors import router as instructors_router
 
-# Load .env (ANTHROPIC_API_KEY, etc.)
+# Load .env (ANTHROPIC_API_KEY)
 load_dotenv()
 
 app = FastAPI(title="CUNYFirst Clone", version="1.0")
 
-# ── CORS ────────────────────────────────────────────────────────
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -47,12 +36,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── DB init on startup ───────────────────────────────────────────
+# DB init on startup 
 @app.on_event("startup")
 async def startup():
     init_db()
 
-# ── Routers ──────────────────────────────────────────────────────
+# Routers 
 app.include_router(auth_router)
 app.include_router(ai_router)
 app.include_router(students_router)
@@ -68,7 +57,7 @@ app.include_router(notifications_router)
 app.include_router(taboo_router)
 app.include_router(admin_router)
 
-# ── Health check ─────────────────────────────────────────────────
+# Health check 
 @app.get("/health")
 async def health():
     return {

@@ -17,20 +17,24 @@ export default function CourseRegistration({ navigate }) {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
 
+
   const fetchData = async () => {
     try {
       setLoading(true);
       console.log('Fetching data...');
 
+      // Fetch current semester period and number
       const periodRes = await fetch(`${API_BASE}/api/semester/period`);
       const periodData = await periodRes.json();
       setCurrentPeriod(periodData.period);
       setSemesterNumber(periodData.semester || 1);
 
+      // Fetch all classes available for this semester
       const classesRes = await fetch(`${API_BASE}/api/classes?semester=${periodData.semester || 1}`);
       const classesData = await classesRes.json();
       setAvailableClasses(classesData.classes || []);
 
+      // Fetch the student's current enrollments and waitlist entries
       if (currentUser) {
         const studentId = currentUser.user_id || currentUser.id;
         console.log('Fetching enrollments for student:', studentId);
@@ -67,10 +71,16 @@ export default function CourseRegistration({ navigate }) {
     fetchData();
   }, [currentUser, refreshTrigger]);
 
+  // ===== Derived State ================================================================
+
+  // Registration is allowed during the registration period, or while running if not suspended
   const canRegister = currentPeriod === 'registration' ||
     (currentPeriod === 'running' && currentUser && !currentUser.suspended);
 
+  // ===== Actions =================================================================
+
   const drop = async (enrollment_id, code) => {
+    console.log('Dropping enrollment_id:', enrollment_id);
     if (isProcessing) return;
     setIsProcessing(true);
 
@@ -137,6 +147,7 @@ export default function CourseRegistration({ navigate }) {
 
       console.log('Response status:', response.status);
 
+      // Parse error details from non-OK responses
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Error response:', errorText);
@@ -160,12 +171,12 @@ export default function CourseRegistration({ navigate }) {
       const result = await response.json();
       console.log('Enroll result:', result);
 
+      // Warn if placed on waitlist rather than directly enrolled
       if (result && result.success) {
         setMsg({
           text: result.message,
           type: result.waitlist ? 'warn' : 'success'
         });
-        // Force a complete refresh by incrementing refreshTrigger
         setRefreshTrigger(prev => prev + 1);
       } else {
         setMsg({
@@ -184,6 +195,8 @@ export default function CourseRegistration({ navigate }) {
     }
   };
 
+  // Handles edge case where a non-registered enrollment record already exists —
+  // drops it first, then re-enrolls cleanly after a short delay
   const fixStuckEnrollment = async (classId, className) => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -192,7 +205,6 @@ export default function CourseRegistration({ navigate }) {
       const studentId = currentUser.user_id || currentUser.id;
       console.log(`Fixing enrollment for ${className}...`);
 
-      // Get current enrollments
       const enrollRes = await fetch(`${API_BASE}/api/student/${studentId}/enrollments`);
       if (!enrollRes.ok) {
         console.error('Failed to fetch enrollments');
@@ -242,12 +254,14 @@ export default function CourseRegistration({ navigate }) {
         Course Registration
       </PageTitle>
 
+      {/* Refresh button — top-right above all cards */}
       <div style={{ marginBottom: '1rem', textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
         <Btn variant="default" onClick={manualRefresh} disabled={isProcessing} style={{ fontSize: '12px' }}>
           🔄 Refresh
         </Btn>
       </div>
 
+      {/* Global status alerts: registration window, suspension, action feedback */}
       {!canRegister && (
         <Alert type="warn">
           Registration is not currently open. Current period: <strong>{currentPeriod}</strong>.
@@ -258,13 +272,17 @@ export default function CourseRegistration({ navigate }) {
       )}
       {msg.text && <Alert type={msg.type}>{msg.text}</Alert>}
 
+      {/* ── My Enrollments Card ──────────────────────────────────────────────── */}
       <Card style={{ marginBottom: '1.5rem' }}>
         <SectionTitle>My Enrollments ({enrolled.length}/{MAX_COURSES})</SectionTitle>
+
         {enrolled.length === 0 && (
           <p style={{ color: 'var(--muted)', fontSize: '13px' }}>
             Not enrolled in any courses.
           </p>
         )}
+
+        {/* Active enrollments table with drop action */}
         {enrolled.length > 0 && (
           <Table
             headers={['Code', 'Course', 'Time', 'Instructor', 'Action']}
@@ -282,6 +300,7 @@ export default function CourseRegistration({ navigate }) {
           />
         )}
 
+        {/* Waitlisted courses — shown below the enrollments table when present */}
         {waitlisted.length > 0 && (
           <div style={{ marginTop: '1rem' }}>
             <div style={{
@@ -317,6 +336,7 @@ export default function CourseRegistration({ navigate }) {
         )}
       </Card>
 
+      {/* ── Available Classes Grid ───────────────────────────────────────────── */}
       <SectionTitle>Available Classes</SectionTitle>
       <div style={{
         display: 'grid',
@@ -324,6 +344,7 @@ export default function CourseRegistration({ navigate }) {
         gap: '1rem'
       }}>
         {availableClasses.map(cls => {
+          // Per-card derived flags
           const alreadyEnrolled = enrolled.some(e => e.class_id === cls.id);
           const onWaitlist = waitlisted.some(e => e.class_id === cls.id);
           const isFull = (cls.enrolled_count || 0) >= cls.capacity;
@@ -333,6 +354,7 @@ export default function CourseRegistration({ navigate }) {
           return (
             <div key={cls.id} style={{
               background: 'var(--surface)',
+              // Border color reflects enrollment state: enrolled → green, waitlist → yellow, default → border
               border: `1px solid ${alreadyEnrolled ? 'var(--success)' : onWaitlist ? 'var(--warn)' : 'var(--border)'}`,
               borderRadius: '8px',
               padding: '1rem',
@@ -340,17 +362,22 @@ export default function CourseRegistration({ navigate }) {
               flexDirection: 'column',
               gap: '0.5rem'
             }}>
+              {/* Course code + required badge */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>
                   {cls.code}
                 </div>
                 {cls.required && <Tag color="var(--accent2)">Required</Tag>}
               </div>
+
+              {/* Course name, time, and instructor */}
               <div style={{ fontWeight: 600 }}>{cls.name}</div>
               <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{cls.class_time}</div>
               <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
                 Instructor: {cls.instructor_name || 'TBA'}
               </div>
+
+              {/* Capacity indicator and star rating */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{
                   fontFamily: 'var(--font-mono)',
@@ -363,6 +390,8 @@ export default function CourseRegistration({ navigate }) {
                   <Stars value={Math.round(avgRating)} />
                 )}
               </div>
+
+              {/* CTA: tag if already enrolled/waitlisted, enroll/waitlist button otherwise */}
               <div style={{ marginTop: 'auto' }}>
                 {alreadyEnrolled ? (
                   <Tag color="var(--success)">✓ Enrolled</Tag>

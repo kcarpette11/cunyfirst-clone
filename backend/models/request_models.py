@@ -2,9 +2,9 @@
 from pydantic import BaseModel
 from typing import Any, Optional, List
 
-# ── AI Chat Models ──────────────────────────────────────────────
+# ===== AI Chat Models ============================================================
 class Message(BaseModel):
-    role: str  # 'user' or 'assistant'
+    role: str  
     content: str
 
 class AskRequest(BaseModel):
@@ -15,10 +15,10 @@ class AskRequest(BaseModel):
 
 class AskResponse(BaseModel):
     answer: str
-    source: str  # 'local' or 'llm'
+    source: str  
     hallucination_warning: bool
 
-# ── Auth Models ─────────────────────────────────────────────────
+# ===== Auth Models ============================================================
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -33,19 +33,19 @@ class UserUpdateRequest(BaseModel):
     suspended: Optional[bool] = None
     terminated: Optional[bool] = None
 
-# ── Enrollment Models ───────────────────────────────────────────
+# ===== Enrollment Models ============================================================
 class EnrollmentRequest(BaseModel):
     studentId: str
     classId: str
     semester: int = 1
 
 class DropEnrollmentRequest(BaseModel):
-    enrollment_id: int  # FIX: renamed from enrollmentId to snake_case
+    enrollment_id: int 
 
 class AdmitWaitlistRequest(BaseModel):
     enrollmentId: int
 
-# ── Grade Models ────────────────────────────────────────────────
+# ===== Grade Models ============================================================
 class GradeRequest(BaseModel):
     enrollmentId: int
     grade: str  # 'A', 'B', 'C', 'D', 'F'
@@ -55,14 +55,14 @@ class GradeJustificationRequest(BaseModel):
     classId: int
     justification: str
 
-# ── Review Models ───────────────────────────────────────────────
+# ===== Review Model ============================================================
 class ReviewRequest(BaseModel):
     studentId: str
     classId: int
     stars: int  # 1-5
     text: str
 
-# ── Complaint Models ────────────────────────────────────────────
+# ===== Complaint Models ============================================================
 class ComplaintRequest(BaseModel):
     fromId: str
     fromRole: str
@@ -73,7 +73,7 @@ class ComplaintResolveRequest(BaseModel):
     complaintId: int
     action: str  # 'warn_against', 'warn_filer', 'deregister', 'dismissed'
 
-# ── Application Models ──────────────────────────────────────────
+# ===== Application Models ============================================================
 class ApplicationRequest(BaseModel):
     applicant_type: str  # 'student' or 'instructor'
     name: str
@@ -87,7 +87,7 @@ class ApplicationProcessRequest(BaseModel):
     decision: str  # 'accepted' or 'rejected'
     justification: Optional[str] = None
 
-# ── Graduation Models ───────────────────────────────────────────
+# ===== Graduation Models ============================================================
 class GraduationApplyRequest(BaseModel):
     studentId: str
 
@@ -96,11 +96,11 @@ class GraduationProcessRequest(BaseModel):
     approve: bool
     note: Optional[str] = None
 
-# ── Semester Models ─────────────────────────────────────────────
+# ===== Semester Model ============================================================
 class SetPeriodRequest(BaseModel):
     period: str  # 'setup', 'registration', 'running', 'grading', 'closed'
 
-# ── Class Management Models ─────────────────────────────────────
+# ===== Class Management Models ============================================================
 class CreateClassRequest(BaseModel):
     code: str
     name: str
@@ -119,15 +119,15 @@ class UpdateClassRequest(BaseModel):
     required: bool
     semester: int
 
-# ── Taboo Word Models ───────────────────────────────────────────
+# ===== Taboo Word Model ============================================================
 class TabooWordRequest(BaseModel):
     word: str
 
-# ── Notification Models ─────────────────────────────────────────
+# ===== Notification Model ============================================================
 class MarkNotificationReadRequest(BaseModel):
     notificationId: int
 
-# ── Admin Models ────────────────────────────────────────────────
+# ===== Admin Models ============================================================
 class WarnUserRequest(BaseModel):
     userId: str
     reason: Optional[str] = None

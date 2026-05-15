@@ -7,6 +7,7 @@ from .taboo import filter_taboo
 
 router = APIRouter()
 
+# ===== Pydantic models for request validation ===========================================================
 
 class ComplaintSubmit(BaseModel):
     from_id: str
@@ -19,10 +20,12 @@ class ComplaintResolveRequest(BaseModel):
     complaintId: int
     action: str
 
+# ===== Complaint Submission Endpoints ===========================================================
 
 @router.post("/api/complaint/submit")
 async def submit_complaint(complaint: ComplaintSubmit):
     with get_conn() as conn:
+        # Verify filer account
         filer = conn.execute(
             "SELECT id, role FROM users WHERE id = ?", (complaint.from_id,)
         ).fetchone()
@@ -33,6 +36,7 @@ async def submit_complaint(complaint: ComplaintSubmit):
         if filer['role'] == 'registrar':
             return {"success": False, "message": "Registrar accounts cannot file complaints."}
 
+        # Verify target account
         against = conn.execute(
             "SELECT id, role FROM users WHERE id = ?", (complaint.against_id,)
         ).fetchone()
@@ -43,18 +47,22 @@ async def submit_complaint(complaint: ComplaintSubmit):
         if against['role'] == 'registrar':
             return {"success": False, "message": "Complaints cannot be filed against the registrar."}
 
+        # Check instructor-instructor complaints
         if filer['role'] == 'instructor' and against['role'] == 'instructor':
             return {"success": False, "message": "Instructors may only file complaints against students."}
 
+        # Taboo word filtering
         _, hit_count = filter_taboo(complaint.text)
         if hit_count > 0:
             return {"success": False, "message": "Your complaint contains inappropriate language and cannot be submitted."}
 
+        # Insert complaint
         conn.execute("""
             INSERT INTO complaints (from_id, from_role, against_id, against_role, text, status, created_at)
             VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
         """, (complaint.from_id, filer['role'], complaint.against_id, against['role'], complaint.text))
 
+        # Issue warnings if needed
         if hit_count >= 3:
             if filer['role'] == 'student':
                 _warn_student(conn, complaint.from_id)
@@ -64,6 +72,7 @@ async def submit_complaint(complaint: ComplaintSubmit):
         conn.commit()
         return {"success": True, "message": "Complaint submitted successfully"}
 
+# ===== Complaint Retrieval Endpoints ===========================================================
 
 @router.get("/api/complaints/all")
 async def get_all_complaints():
@@ -144,6 +153,24 @@ async def get_student_complaints(student_id: str):
         return {"complaints": [dict(c) for c in complaints]}
 
 
+@router.get("/api/complaints/instructor/{user_id}")
+async def get_instructor_complaints(user_id: int):
+    with get_conn() as conn:
+        complaints = conn.execute("""
+            SELECT c.*,
+                   COALESCE(s.name, i.name, u.username) as against_name,
+                   u.role as against_role
+            FROM complaints c
+            JOIN users u ON c.against_id = u.id
+            LEFT JOIN students s ON u.id = s.user_id
+            LEFT JOIN instructors i ON u.id = i.user_id
+            WHERE c.from_id = ? AND c.from_role = 'instructor'
+            ORDER BY c.created_at DESC
+        """, (user_id,)).fetchall()
+
+        return {"complaints": [dict(c) for c in complaints]}
+
+
 @router.get("/api/complaints/targets/{student_id}")
 async def get_complaint_targets(student_id: str):
     with get_conn() as conn:
@@ -154,6 +181,7 @@ async def get_complaint_targets(student_id: str):
             "SELECT id FROM students WHERE user_id = ?", (student_id,)
         ).fetchone()
 
+        # Get instructors from enrolled classes
         instructors = []
         if student_row:
             enrolled_classes = conn.execute("""
@@ -172,6 +200,7 @@ async def get_complaint_targets(student_id: str):
                     WHERE c.id IN ({placeholders})
                 """, class_ids).fetchall()
 
+        # Get all students except current
         students = conn.execute("""
             SELECT s.user_id as id, s.name, s.student_code
             FROM students s
@@ -184,6 +213,7 @@ async def get_complaint_targets(student_id: str):
             "students": [dict(s) for s in students]
         }
 
+# ===== Internal Warning Functions ===========================================================
 
 def _warn_student(conn, user_id: int) -> str:
     semester_row = conn.execute(
@@ -253,6 +283,7 @@ def _warn_instructor(conn, user_id: int) -> str:
         )
         return f"Warning {new_warnings}/3 issued to instructor."
 
+# ===== Complaint Resolution Endpoint ===========================================================
 
 @router.post("/api/complaint/resolve")
 async def resolve_complaint(req: ComplaintResolveRequest):
@@ -272,6 +303,7 @@ async def resolve_complaint(req: ComplaintResolveRequest):
             WHERE id = ?
         """, (req.action, req.complaintId))
 
+        # Handle different resolution actions
         if req.action == 'warn_against':
             if complaint['against_role'] == 'student':
                 outcome_msg = _warn_student(conn, complaint['against_id'])
@@ -298,21 +330,3 @@ async def resolve_complaint(req: ComplaintResolveRequest):
 
         conn.commit()
         return {"success": True, "message": outcome_msg}
-
-
-@router.get("/api/complaints/instructor/{user_id}")
-async def get_instructor_complaints(user_id: int):
-    with get_conn() as conn:
-        complaints = conn.execute("""
-            SELECT c.*,
-                   COALESCE(s.name, i.name, u.username) as against_name,
-                   u.role as against_role
-            FROM complaints c
-            JOIN users u ON c.against_id = u.id
-            LEFT JOIN students s ON u.id = s.user_id
-            LEFT JOIN instructors i ON u.id = i.user_id
-            WHERE c.from_id = ? AND c.from_role = 'instructor'
-            ORDER BY c.created_at DESC
-        """, (user_id,)).fetchall()
-
-        return {"complaints": [dict(c) for c in complaints]}
