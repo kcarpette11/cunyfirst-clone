@@ -30,8 +30,8 @@ async def submit_review(req: ReviewRequest):
             return {"success": False, "message": "You are not enrolled in this class"}
         
         # Check if grade already posted
-        if enrollment['grade'] and enrollment['grade'] != 'IP':
-            return {"success": False, "message": "Cannot review after grades are posted"}
+        if not enrollment['grade'] or enrollment['grade'] == 'IP':
+            return {"success": False, "message": "Reviews can only be submitted after grades are posted"}
         
         # Check if already reviewed
         existing = conn.execute(

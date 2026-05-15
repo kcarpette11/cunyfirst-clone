@@ -1,7 +1,9 @@
+import re
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from database import get_conn
 from services.warning_system import issue_warning
+from .taboo import filter_taboo
 
 router = APIRouter()
 
@@ -20,10 +22,7 @@ class ComplaintResolveRequest(BaseModel):
 
 @router.post("/api/complaint/submit")
 async def submit_complaint(complaint: ComplaintSubmit):
-    """Submit a complaint. from_id and against_id must be users.id values."""
     with get_conn() as conn:
-
-        # Verify filer exists in users table
         filer = conn.execute(
             "SELECT id, role FROM users WHERE id = ?", (complaint.from_id,)
         ).fetchone()
@@ -31,11 +30,9 @@ async def submit_complaint(complaint: ComplaintSubmit):
         if not filer:
             return {"success": False, "message": "Filer account not found"}
 
-        # Registrar/dean cannot file complaints — they resolve them
         if filer['role'] == 'registrar':
             return {"success": False, "message": "Registrar accounts cannot file complaints."}
 
-        # Verify target exists in users table
         against = conn.execute(
             "SELECT id, role FROM users WHERE id = ?", (complaint.against_id,)
         ).fetchone()
@@ -43,31 +40,33 @@ async def submit_complaint(complaint: ComplaintSubmit):
         if not against:
             return {"success": False, "message": "Target user not found"}
 
-        # Registrar/dean cannot be complained against — they are the arbiters
         if against['role'] == 'registrar':
             return {"success": False, "message": "Complaints cannot be filed against the registrar."}
 
-        # Enforce valid complaint directions:
-        # - student   → student    ✓
-        # - student   → instructor ✓
-        # - instructor → student  ✓
-        # - instructor → instructor ✗
         if filer['role'] == 'instructor' and against['role'] == 'instructor':
             return {"success": False, "message": "Instructors may only file complaints against students."}
+
+        _, hit_count = filter_taboo(complaint.text)
+        if hit_count > 0:
+            return {"success": False, "message": "Your complaint contains inappropriate language and cannot be submitted."}
 
         conn.execute("""
             INSERT INTO complaints (from_id, from_role, against_id, against_role, text, status, created_at)
             VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
         """, (complaint.from_id, filer['role'], complaint.against_id, against['role'], complaint.text))
 
-        conn.commit()
+        if hit_count >= 3:
+            if filer['role'] == 'student':
+                _warn_student(conn, complaint.from_id)
+            else:
+                _warn_instructor(conn, complaint.from_id)
 
+        conn.commit()
         return {"success": True, "message": "Complaint submitted successfully"}
 
 
 @router.get("/api/complaints/all")
 async def get_all_complaints():
-    """Get all complaints. Names resolved via students/instructors tables joined on user_id."""
     with get_conn() as conn:
         pending = conn.execute("""
             SELECT c.*,
@@ -108,7 +107,6 @@ async def get_all_complaints():
 
 @router.get("/api/complaints/pending")
 async def get_pending_complaints():
-    """Get only pending complaints."""
     with get_conn() as conn:
         complaints = conn.execute("""
             SELECT c.*,
@@ -130,7 +128,6 @@ async def get_pending_complaints():
 
 @router.get("/api/complaints/student/{student_id}")
 async def get_student_complaints(student_id: str):
-    """Get complaints filed by a student. student_id is users.id."""
     with get_conn() as conn:
         complaints = conn.execute("""
             SELECT c.*,
@@ -149,8 +146,6 @@ async def get_student_complaints(student_id: str):
 
 @router.get("/api/complaints/targets/{student_id}")
 async def get_complaint_targets(student_id: str):
-    """Get possible complaint targets for a student. student_id is users.id.
-    Returns user_id (users.id) as 'id' so the frontend sends the correct FK."""
     with get_conn() as conn:
         semester = conn.execute("SELECT value FROM settings WHERE key = 'semester'").fetchone()
         current_semester = int(semester['value']) if semester else 1
@@ -177,7 +172,6 @@ async def get_complaint_targets(student_id: str):
                     WHERE c.id IN ({placeholders})
                 """, class_ids).fetchall()
 
-        # All other active students — expose user_id as 'id'
         students = conn.execute("""
             SELECT s.user_id as id, s.name, s.student_code
             FROM students s
@@ -192,11 +186,6 @@ async def get_complaint_targets(student_id: str):
 
 
 def _warn_student(conn, user_id: int) -> str:
-    """
-    Issue one warning to a student (looked up by users.id).
-    If warnings reach 3: suspend for 1 semester and flag fine_paid = 0.
-    Returns a human-readable outcome message.
-    """
     semester_row = conn.execute(
         "SELECT value FROM settings WHERE key = 'semester'"
     ).fetchone()
@@ -220,7 +209,6 @@ def _warn_student(conn, user_id: int) -> str:
                 fine_paid = 0
             WHERE user_id = ?
         """, (new_warnings, suspend_until, user_id))
-        # Drop all current registrations
         conn.execute("""
             UPDATE enrollments SET status = 'dropped'
             WHERE student_id = ? AND status = 'registered'
@@ -238,11 +226,6 @@ def _warn_student(conn, user_id: int) -> str:
 
 
 def _warn_instructor(conn, user_id: int) -> str:
-    """
-    Issue one warning to an instructor (looked up by users.id).
-    At 3 warnings the instructor is suspended for the next semester.
-    Returns a human-readable outcome message.
-    """
     semester_row = conn.execute(
         "SELECT value FROM settings WHERE key = 'semester'"
     ).fetchone()
@@ -273,15 +256,6 @@ def _warn_instructor(conn, user_id: int) -> str:
 
 @router.post("/api/complaint/resolve")
 async def resolve_complaint(req: ComplaintResolveRequest):
-    """
-    Resolve a pending complaint.
-
-    Valid actions:
-      warn_against  — warn the person complained about
-      warn_filer    — warn the person who filed (unfounded complaint)
-      deregister    — drop all enrollments for the student complained about
-      dismissed     — close with no action
-    """
     with get_conn() as conn:
         complaint = conn.execute(
             "SELECT * FROM complaints WHERE id = ?", (req.complaintId,)
@@ -328,7 +302,6 @@ async def resolve_complaint(req: ComplaintResolveRequest):
 
 @router.get("/api/complaints/instructor/{user_id}")
 async def get_instructor_complaints(user_id: int):
-    """Get complaints filed by an instructor. user_id is users.id."""
     with get_conn() as conn:
         complaints = conn.execute("""
             SELECT c.*,

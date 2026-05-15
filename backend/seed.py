@@ -109,7 +109,6 @@ def seed():
             class_ids.append(cur.lastrowid)
 
         # Enrollments
-        # Existing enrollments for Alice, Ben, Cora, David, Eva
         for sid, cid in [(student_ids[0], class_ids[0]), (student_ids[0], class_ids[1]), (student_ids[0], class_ids[2])]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, cid))
         for sid, cid in [(student_ids[1], class_ids[0]), (student_ids[1], class_ids[2]), (student_ids[1], class_ids[3])]:
@@ -120,7 +119,7 @@ def seed():
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, cid))
         for sid, cid in [(student_ids[4], class_ids[0]), (student_ids[4], class_ids[3])]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, cid))
-        
+
         # Additional enrollments
         for cid in [class_ids[4], class_ids[5]]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (student_ids[0], cid))
@@ -128,7 +127,7 @@ def seed():
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (student_ids[1], cid))
         for cid in [class_ids[5], class_ids[7]]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (student_ids[2], cid))
-        
+
         # New students enrollments
         for cid in [class_ids[4], class_ids[6], class_ids[8]]:
             conn.execute("INSERT INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (student_ids[5], cid))
@@ -150,66 +149,51 @@ def seed():
             conn.execute("INSERT OR IGNORE INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, class_ids[0]))
             conn.execute("INSERT OR IGNORE INTO enrollments(student_id, class_id, semester, status) VALUES(?,?,1,'registered')", (sid, class_ids[3]))
 
-        # ──────────────────────────────────────────────────────────────
-        # MAKE BEN ELIGIBLE FOR GRADUATION
-        # ──────────────────────────────────────────────────────────────
-        
-        ben_student_id = student_ids[1]  # Ben is index 1
-        
-        print("\n🎓 Making Ben eligible for graduation...")
-        
-        # Get required course IDs
-        required_courses = conn.execute("SELECT id FROM courses WHERE required = 1").fetchall()
-        required_ids = [r["id"] for r in required_courses]
-        
-        # Get all class IDs
-        all_class_ids = [c["id"] for c in conn.execute("SELECT id FROM classes").fetchall()]
-        
+        # ── MAKE BEN ELIGIBLE FOR GRADUATION ──────────────────────────
+        ben_student_id = student_ids[1]
+
         # Clear Ben's existing enrollments
         conn.execute("DELETE FROM enrollments WHERE student_id = ?", (ben_student_id,))
-        
-        # Enroll Ben in 8 courses with good grades
-        graduation_courses = all_class_ids[:8] if len(all_class_ids) >= 8 else all_class_ids
-        
-        for i, class_id in enumerate(graduation_courses):
-            # Get course info to check if required
-            course_info = conn.execute("SELECT course_id FROM classes WHERE id = ?", (class_id,)).fetchone()
-            is_required = course_info and course_info['course_id'] in required_ids
-            
-            grade = 'A' if is_required else ('B' if i % 2 == 0 else 'A')
-            
+
+        # Get all required course class IDs first
+        required_class_ids = [r["id"] for r in conn.execute("""
+            SELECT c.id FROM classes c
+            JOIN courses cs ON c.course_id = cs.id
+            WHERE cs.required = 1
+        """).fetchall()]
+
+        # Fill remaining slots with non-required classes
+        non_required_class_ids = [r["id"] for r in conn.execute("""
+            SELECT c.id FROM classes c
+            JOIN courses cs ON c.course_id = cs.id
+            WHERE cs.required = 0
+        """).fetchall()]
+
+        # All required first, then pad with electives to reach 8
+        graduation_classes = required_class_ids + [
+            cid for cid in non_required_class_ids if cid not in required_class_ids
+        ]
+        graduation_classes = graduation_classes[:max(8, len(required_class_ids))]
+
+        for class_id in graduation_classes:
             conn.execute("""
                 INSERT INTO enrollments (student_id, class_id, semester, status, grade)
-                VALUES (?, ?, 1, 'completed', ?)
-            """, (ben_student_id, class_id, grade))
-        
-        print(f"  - Enrolled Ben in {len(graduation_courses)} courses with grades")
-        
+                VALUES (?, ?, 1, 'registered', 'A')
+            """, (ben_student_id, class_id))
+
         # Update Ben's student record
         conn.execute("""
             UPDATE students 
-            SET gpa = 3.75, 
-                semester_gpa = 3.8,
-                honor_roll = 1,
-                honor_count = 1,
-                warnings = 0,
-                semesters_completed = 2
+            SET gpa = 3.75, semester_gpa = 3.8, honor_roll = 1,
+                honor_count = 1, warnings = 0, semesters_completed = 2
             WHERE id = ?
         """, (ben_student_id,))
-        
-        # Add graduation application for Ben
+
+        # Add Ben's graduation application
         conn.execute("""
-            INSERT OR IGNORE INTO graduation_apps (student_id, status, created_at)
+            INSERT INTO graduation_apps (student_id, status, created_at)
             VALUES (?, 'pending', datetime('now'))
         """, (ben_student_id,))
-        
-        print(f"✅ Ben Martinez is now eligible for graduation!")
-        print(f"   - Completed courses: {len(graduation_courses)}/8")
-        print(f"   - GPA: 3.75")
-        print(f"   - Graduation application: pending")
-
-        # ──────────────────────────────────────────────────────────────
-        # NEW TABLES ADDED BELOW
         # ──────────────────────────────────────────────────────────────
 
         # Taboo words
@@ -217,54 +201,27 @@ def seed():
         for word in taboo_words:
             conn.execute("INSERT OR IGNORE INTO taboo_words(word) VALUES(?)", (word,))
 
-        # Notifications table
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS notifications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                message TEXT,
-                type TEXT,
-                read INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        """)
-        
         # Sample notifications
         sample_notifications = [
-            (student_ids[0], "Welcome to College0! Your account has been created.", "info"),
-            (student_ids[0], "Registration for the new semester is now open!", "success"),
-            (student_ids[1], "Don't forget to submit your course reviews before the deadline.", "warn"),
-            (student_ids[2], "Your GPA is below 3.0. Consider meeting with an advisor.", "warn"),
-            (student_ids[3], "Congratulations! You've been placed on the Honor Roll.", "success"),
-            (student_ids[4], "Warning: You have 2 warnings remaining before suspension.", "danger"),
-            (student_ids[5], "New course registration is open!", "info"),
-            (student_ids[6], "You have been selected for academic recognition!", "success"),
-            (student_ids[7], "Please complete your course evaluations.", "warn"),
-            (student_ids[8], "Your scholarship application deadline is approaching.", "info"),
-            (student_ids[9], "Welcome to the new semester!", "info"),
+            (student_user_ids[0], "Welcome to College0! Your account has been created.", "info"),
+            (student_user_ids[0], "Registration for the new semester is now open!", "success"),
+            (student_user_ids[1], "Don't forget to submit your course reviews before the deadline.", "warn"),
+            (student_user_ids[2], "Your GPA is below 3.0. Consider meeting with an advisor.", "warn"),
+            (student_user_ids[3], "Congratulations! You've been placed on the Honor Roll.", "success"),
+            (student_user_ids[4], "Warning: You have 2 warnings remaining before suspension.", "danger"),
+            (student_user_ids[5], "New course registration is open!", "info"),
+            (student_user_ids[6], "You have been selected for academic recognition!", "success"),
+            (student_user_ids[7], "Please complete your course evaluations.", "warn"),
+            (student_user_ids[8], "Your scholarship application deadline is approaching.", "info"),
+            (student_user_ids[9], "Welcome to the new semester!", "info"),
         ]
-        for user_id, message, type in sample_notifications:
+        for user_id, message, ntype in sample_notifications:
             conn.execute("""
                 INSERT INTO notifications (user_id, message, type, created_at)
                 VALUES (?, ?, ?, datetime('now'))
-            """, (user_id, message, type))
+            """, (user_id, message, ntype))
 
-        # Grade justifications table
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS grade_justifications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                instructor_id INTEGER,
-                class_id INTEGER,
-                justification TEXT,
-                reviewed INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                reviewed_at TIMESTAMP,
-                FOREIGN KEY (instructor_id) REFERENCES instructors(id),
-                FOREIGN KEY (class_id) REFERENCES classes(id)
-            )
-        """)
-        
+        # Grade justifications
         grade_justifications_data = [
             (instructor_ids[0], class_ids[0], "The class performed exceptionally well this semester due to extra study sessions and high motivation.", 0),
             (instructor_ids[1], class_ids[1], "Students struggled initially but showed great improvement. Grades reflect final performance.", 0),
@@ -276,42 +233,12 @@ def seed():
                 VALUES (?, ?, ?, ?)
             """, (inst_id, cls_id, justification, reviewed))
 
-        # Graduation applications table
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS graduation_apps (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                student_id INTEGER,
-                status TEXT DEFAULT 'pending',
-                note TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                processed_at TIMESTAMP,
-                FOREIGN KEY (student_id) REFERENCES students(id)
-            )
-        """)
-        
+        # Graduation applications (Alice pending, David approved, Grace rejected)
         conn.execute("INSERT INTO graduation_apps (student_id, status, created_at) VALUES (?, 'pending', datetime('now'))", (student_ids[0],))
         conn.execute("INSERT INTO graduation_apps (student_id, status, created_at) VALUES (?, 'approved', datetime('now', '-7 days'))", (student_ids[3],))
         conn.execute("INSERT INTO graduation_apps (student_id, status, created_at) VALUES (?, 'rejected', datetime('now', '-14 days'))", (student_ids[6],))
 
-        # Applications table
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS applications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                applicant_type TEXT NOT NULL CHECK(applicant_type IN ('student','instructor')),
-                name TEXT NOT NULL,
-                email TEXT,
-                incoming_gpa REAL,
-                program TEXT,
-                statement TEXT,
-                status TEXT DEFAULT 'pending' CHECK(status IN ('pending','accepted','rejected')),
-                registrar_note TEXT,
-                assigned_username TEXT,
-                assigned_password TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                reviewed_at TIMESTAMP
-            )
-        """)
-        
+        # Sample applications
         sample_apps = [
             ("student", "John Smith", "john@email.com", 3.8, "Computer Science", "I have a strong background in programming and want to pursue AI."),
             ("student", "Mary Jones", "mary@email.com", 2.9, "Business", "Looking to enhance my career with a graduate degree."),
@@ -324,24 +251,6 @@ def seed():
                 INSERT INTO applications (applicant_type, name, email, incoming_gpa, program, statement, status)
                 VALUES (?, ?, ?, ?, ?, ?, 'pending')
             """, (app_type, name, email, gpa, program, statement))
-
-        # Complaints table
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS complaints (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                from_id INTEGER,
-                from_role TEXT,
-                against_id INTEGER,
-                against_role TEXT,
-                text TEXT,
-                status TEXT DEFAULT 'pending',
-                resolution TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                resolved_at TIMESTAMP,
-                FOREIGN KEY (from_id) REFERENCES users(id),
-                FOREIGN KEY (against_id) REFERENCES users(id)
-            )
-        """)
 
         # Knowledge base
         knowledge = [
@@ -369,7 +278,7 @@ def seed():
     print("   - Notifications, grade justifications")
     print("   - Graduation applications, complaints")
     print("   - Sample applications for testing")
-    print("\n🎓 Ben Martinez is now eligible for graduation (8+ courses, GPA 3.75)")
+    print("\n🎓 Ben Martinez is now eligible for graduation (all required courses + 8 total, GPA 3.75)")
 
 if __name__ == "__main__":
     seed()

@@ -400,3 +400,42 @@ async def enroll_student_debug(req: EnrollmentRequest):
                 "class_id_type": str(type(req.classId))
             }
         }
+
+@router.get("/api/enrollments/all")
+async def get_all_enrollments():
+    with get_conn() as conn:
+        enrollments = conn.execute("""
+            SELECT e.*, cs.code, cs.title as name, cs.required
+            FROM enrollments e
+            JOIN classes c ON e.class_id = c.id
+            JOIN courses cs ON c.course_id = cs.id
+        """).fetchall()
+
+        return {"enrollments": [dict(e) for e in enrollments]}
+
+@router.get("/api/grade-justifications")
+async def get_grade_justifications():
+    """Get all grade justifications"""
+    with get_conn() as conn:
+        justifications = conn.execute("""
+            SELECT gj.*, i.name as instructor_name, cs.code, cs.title as name
+            FROM grade_justifications gj
+            JOIN instructors i ON gj.instructor_id = i.id
+            JOIN classes c ON gj.class_id = c.id
+            JOIN courses cs ON c.course_id = cs.id
+            ORDER BY gj.created_at DESC
+        """).fetchall()
+
+        return {"justifications": [dict(j) for j in justifications]}
+
+@router.post("/api/grade-justification/accept")
+async def accept_grade_justification(classId: int, instructorId: int):
+    """Mark a grade justification as reviewed/accepted"""
+    with get_conn() as conn:
+        conn.execute("""
+            UPDATE grade_justifications
+            SET reviewed = 1, reviewed_at = CURRENT_TIMESTAMP
+            WHERE class_id = ? AND instructor_id = ?
+        """, (classId, instructorId))
+
+        return {"success": True, "message": "Justification accepted"}

@@ -112,7 +112,18 @@ async def get_ai_context(user_id: int):
                 "SELECT * FROM students WHERE user_id = ?", (user_id,)
             ).fetchone()
             if student:
-                context["student"] = dict(student)
+                student_dict = dict(student)
+                
+                enrollments = conn.execute("""
+                    SELECT e.grade, cs.code, cs.title as name
+                    FROM enrollments e
+                    JOIN classes c ON e.class_id = c.id
+                    JOIN courses cs ON c.course_id = cs.id
+                    WHERE e.student_id = ? AND e.status = 'registered'
+                """, (student['id'],)).fetchall()
+                
+                student_dict["enrollments"] = [dict(e) for e in enrollments]
+                context["student"] = student_dict
         
         # Get instructor info if user is instructor
         if user and user['role'] == 'instructor':
@@ -164,19 +175,13 @@ async def ask(req: AskRequest):
         use_local_only = len(relevant) >= 2
         
         print("Step 6: Building system prompt...")
-        if use_local_only:
-            system_prompt = (
-                "You are the College0 AI assistant. Answer using ONLY the provided "
-                "College0 context. If the context is not enough, say that clearly. "
-                "Do not invent facts.\n\nContext:\n" + "\n".join(f"- {entry}" for entry in relevant)
-            )
-        else:
-            system_prompt = (
-                "You are the College0 AI assistant. The local knowledge base did not "
-                "contain enough information. Give a helpful general answer, but mention "
-                "it may not reflect College0-specific policies.\n\nSome College0 context:\n"
-                + "\n".join(f"- {entry}" for entry in (relevant or get_static_knowledge()[:10]))
-            )
+        context_entries = dynamic_entries + relevant
+        system_prompt = (
+            "You are the CunyZero AI assistant. Answer based on the provided context about "
+            "the student and their data. Never say you don't have access to their information — "
+            "it is provided below. Do not invent facts not in the context.\n\nContext:\n"
+            + "\n".join(f"- {entry}" for entry in context_entries)
+        )
         print(f"  ✓ System prompt length: {len(system_prompt)}")
         
         print("Step 7: Building history messages...")

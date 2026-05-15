@@ -59,29 +59,38 @@ async def apply_for_graduation(req: GraduationApplyRequest):
 
 @router.get("/api/graduation/applications")
 async def get_graduation_applications():
-    """Get all graduation applications"""
     with get_conn() as conn:
-        pending = conn.execute("""
-            SELECT g.*, s.name as student_name, s.student_code
+        pending_apps = conn.execute("""
+            SELECT g.*, s.name as student_name, s.student_code, s.user_id
             FROM graduation_apps g
             JOIN students s ON g.student_id = s.id
             WHERE g.status = 'pending'
             ORDER BY g.created_at ASC
         """).fetchall()
-        
-        processed = conn.execute("""
-            SELECT g.*, s.name as student_name, s.student_code
-            FROM graduation_apps g
-            JOIN students s ON g.student_id = s.id
-            WHERE g.status != 'pending'
-            ORDER BY g.created_at DESC
-            LIMIT 50
-        """).fetchall()
-        
-        return {
-            "pending": [dict(g) for g in pending],
-            "processed": [dict(g) for g in processed]
-        }
+
+        required_courses = conn.execute(
+            "SELECT * FROM courses WHERE required = 1"
+        ).fetchall()
+
+        pending = []
+        for app in pending_apps:
+            completed = conn.execute("""
+                SELECT DISTINCT c.course_id
+                FROM enrollments e
+                JOIN classes c ON e.class_id = c.id
+                WHERE e.student_id = ? AND e.grade IS NOT NULL 
+                  AND e.grade != 'F' AND e.grade != 'IP'
+            """, (app['student_id'],)).fetchall()
+
+            completed_course_ids = [r['course_id'] for r in completed]
+            missing = [c['code'] for c in required_courses if c['id'] not in completed_course_ids]
+
+            app_dict = dict(app)
+            app_dict['completed_count'] = len(completed)
+            app_dict['missing_required'] = missing
+            pending.append(app_dict)
+
+        return {"pending": pending}
 
 @router.get("/api/graduation/pending")
 async def get_pending_graduation_applications():
@@ -150,7 +159,7 @@ async def get_graduation_status(user_id: str):
         # Get completed courses
         # FIX: 'code' is on courses (cs), not classes (c)
         completed = conn.execute("""
-            SELECT e.*, cs.code, cs.title as name, cs.required
+            SELECT e.*, c.course_id, cs.code, cs.title as name, cs.required
             FROM enrollments e
             JOIN classes c ON e.class_id = c.id
             JOIN courses cs ON c.course_id = cs.id
@@ -170,9 +179,9 @@ async def get_graduation_status(user_id: str):
         # Get required courses
         required = conn.execute("SELECT * FROM courses WHERE required = 1").fetchall()
         
-        completed_ids = [e['class_id'] for e in completed]
-        completed_required = [c for c in required if c['id'] in completed_ids]
-        missing_required = [c for c in required if c['id'] not in completed_ids]
+        completed_course_ids = [e['course_id'] for e in completed]
+        completed_required = [c for c in required if c['id'] in completed_course_ids]
+        missing_required = [c for c in required if c['id'] not in completed_course_ids]
         
         existing_app = conn.execute(
             "SELECT * FROM graduation_apps WHERE student_id = ? AND status = 'pending'",

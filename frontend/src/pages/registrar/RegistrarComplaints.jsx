@@ -43,7 +43,7 @@ export default function RegistrarComplaints({ navigate }) {
     }
   };
 
-useEffect(() => {
+  useEffect(() => {
     fetchData();
   }, [refreshTrigger]);
 
@@ -97,15 +97,11 @@ useEffect(() => {
     }
   };
 
-  const getGraduationStatus = (studentId) => {
-    const studentEnrollments = enrollments.filter(
-      e => e.student_id == studentId && e.grade && e.grade !== 'F' && e.grade !== 'IP'
-    );
-    const completedCount = studentEnrollments.length;
-    const requiredClasses = classes.filter(c => c.required);
-    const completedIds = studentEnrollments.map(e => e.class_id);
-    const missingRequired = requiredClasses.filter(c => !completedIds.includes(c.id));
-    return { completedCount, missingRequired };
+  const getGraduationStatus = (g) => {
+    return {
+      completedCount: g.completed_count || 0,
+      missingRequired: (g.missing_required || []).map(code => ({ code }))
+    };
   };
 
   if (loading) {
@@ -125,7 +121,7 @@ useEffect(() => {
         <Card style={{ marginBottom: '1.5rem' }}>
           <SectionTitle>🎓 Graduation Applications</SectionTitle>
           {pendingGrad.map(g => {
-            const { completedCount, missingRequired } = getGraduationStatus(g.student_id);
+            const { completedCount, missingRequired } = getGraduationStatus(g);
             return (
               <div key={g.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
                 <div style={{ marginBottom: '0.75rem', padding: '0.75rem', borderRadius: '6px', background: 'var(--surface2)' }}>

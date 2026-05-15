@@ -1,9 +1,25 @@
-# api/taboo.py - Taboo word management endpoints
+import re
 from fastapi import APIRouter, HTTPException
 from models.request_models import TabooWordRequest
 from database import get_conn
 
 router = APIRouter()
+
+def filter_taboo(text: str) -> tuple[str, int]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT word FROM taboo_words").fetchall()
+        words = [r['word'] for r in rows]
+
+    count = 0
+    for word in words:
+        pattern = re.compile(re.escape(word), re.IGNORECASE)
+        matches = pattern.findall(text)
+        if matches:
+            count += len(matches)
+            censored = word[0] + '*' * (len(word) - 1)
+            text = pattern.sub(censored, text)
+
+    return text, count
 
 @router.get("/api/taboo-words")
 async def get_taboo_words():

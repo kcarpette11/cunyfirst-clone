@@ -235,6 +235,25 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+
+        # Complaints table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS complaints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_id INTEGER,
+                from_role TEXT,
+                against_id INTEGER,
+                against_role TEXT,
+                text TEXT,
+                is_hidden INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                resolution TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP,
+                FOREIGN KEY (from_id) REFERENCES users(id),
+                FOREIGN KEY (against_id) REFERENCES users(id)
+            )
+        """)
         
         print("✅ All tables created successfully")
 
